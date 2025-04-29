@@ -7,6 +7,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentTranscript = '';
   let isMeetingPage = false;
   let isMeetingActive = false;
+  let isParticipating = false;
+  let autoDetectionEnabled = true;
 
   function logDebug(message) {
     debugArea.textContent = message;
@@ -20,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
       stopButton.disabled = false;
     } else {
       statusDiv.className = 'status';
-      startButton.disabled = !isMeetingPage;
+      startButton.disabled = !isMeetingPage || !isMeetingActive || !isParticipating;
       stopButton.disabled = true;
     }
   }
@@ -66,31 +68,28 @@ document.addEventListener('DOMContentLoaded', () => {
       isMeetingPage = true;
       isMeetingActive = true; // Set meeting as active when we detect a valid URL
       
-      // Check recording status and meeting status
-      chrome.tabs.sendMessage(tabs[0].id, { action: 'getStatus' }, (response) => {
-        // Ignore chrome.runtime.lastError
-        if (chrome.runtime.lastError) {
-          console.log('Initial status check error:', chrome.runtime.lastError.message);
-          updateStatus('Google Meet detected - Click Start');
-          return;
-        }
-        
-        if (response) {
-          isMeetingActive = response.isMeetingActive;
-          
-          if (!response.isMeetingActive) {
-            updateStatus('Meeting has ended', false);
-            logDebug('The meeting has ended. Please join a new meeting to start recording.');
-            return;
+      // First try to force initialize the content script to ensure it's properly loaded
+      chrome.tabs.sendMessage(tabs[0].id, { action: 'forceInitialize' })
+        .then(response => {
+          if (response && response.initialized) {
+            logDebug('Meeting detection initialized successfully');
+            checkStatus(tabs[0].id);
           }
-          
-          if (response.isRecording) {
-            updateStatus('Recording in progress', true);
-          } else {
-            updateStatus('Meeting in progress - Ready to record');
-          }
-        }
-      });
+        })
+        .catch(error => {
+          console.log('Error initializing content script:', error);
+          // Fallback to injecting the script
+          injectContentScript()
+            .then(() => {
+              // Give the script time to initialize
+              setTimeout(() => {
+                checkStatus(tabs[0].id);
+              }, 1000);
+            })
+            .catch(error => {
+              logDebug('Extension needs permission to access Google Meet. Please reload the meeting page.');
+            });
+        });
     } else if (tabs[0] && tabs[0].url.includes('meet.google.com')) {
       updateStatus('Google Meet homepage detected');
       logDebug('Please join a meeting to start recording.\nURL should be: meet.google.com/xxx-xxxx-xxx');
@@ -99,6 +98,59 @@ document.addEventListener('DOMContentLoaded', () => {
       logDebug('Please open a Google Meet meeting to use this extension.');
     }
   });
+
+  // Function to check status
+  function checkStatus(tabId) {
+    chrome.tabs.sendMessage(tabId, { action: 'getStatus' }, (response) => {
+      // Handle case where content script isn't loaded yet
+      if (chrome.runtime.lastError) {
+        console.log('Status check error:', chrome.runtime.lastError.message);
+        updateStatus('Google Meet detected - Click Start');
+        logDebug('Waiting for the extension to connect to the meeting...');
+        
+        // Try to inject again after a short delay
+        setTimeout(() => {
+          injectContentScript()
+            .then(() => {
+              logDebug('Content script injected. Auto-recording should start momentarily...');
+            })
+            .catch(error => {
+              logDebug('Error: ' + error.message);
+            });
+        }, 1000);
+        return;
+      }
+      
+      if (response) {
+        isMeetingActive = response.isMeetingActive;
+        isParticipating = response.isParticipating;
+        
+        if (!response.isMeetingActive) {
+          updateStatus('Meeting has ended', false);
+          logDebug('The meeting has ended. Please join a new meeting to start recording.');
+          return;
+        }
+        
+        if (response.isRecording) {
+          updateStatus('Recording in progress', true);
+          if (response.autoStarted) {
+            logDebug('Recording started automatically when you joined the meeting.');
+          }
+        } else if (response.isParticipating) {
+          updateStatus('In active meeting - Ready to record', false);
+          logDebug('You are in an active meeting. Recording will start automatically in a few seconds or you can click Start.');
+          
+          // If we detect participation but recording hasn't started, try to force start
+          setTimeout(() => {
+            chrome.tabs.sendMessage(tabId, { action: 'forceInitialize' });
+          }, 2000);
+        } else {
+          updateStatus('Waiting to join meeting');
+          logDebug('You are on a meeting page but not yet actively participating. Recording will start automatically when you join.');
+        }
+      }
+    });
+  }
 
   startButton.addEventListener('click', async () => {
     try {
@@ -145,6 +197,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (statusResponse && !statusResponse.isMeetingActive) {
                   updateStatus('Meeting has ended');
                   startButton.disabled = true;
+                } else if (statusResponse && statusResponse.isParticipating) {
+                  updateStatus('In active meeting - Ready to record');
+                  logDebug('Recording will restart automatically in a few seconds while you are in the meeting.');
                 } else {
                   updateStatus('Ready');
                 }
@@ -185,6 +240,10 @@ document.addEventListener('DOMContentLoaded', () => {
         updateStatus('Meeting has ended');
         startButton.disabled = true;
         isMeetingActive = false;
+        isParticipating = false;
+      } else if (message.text.includes('Meeting detected - Recording started automatically')) {
+        updateStatus('Recording in progress', true);
+        logDebug('Meeting detected - Recording started automatically!');
       }
     } else if (message.type === 'error') {
       logDebug('Error: ' + message.error);

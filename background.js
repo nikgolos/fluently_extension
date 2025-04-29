@@ -2,6 +2,7 @@ console.log("Background script loaded");
 
 let currentTranscript = '';
 let isRecordingStopped = false;
+let pendingInjections = {};
 
 function sendDebugMessage(message) {
   console.log("DEBUG:", message);
@@ -16,6 +17,37 @@ function isGoogleMeetMeetingUrl(url) {
   if (!url) return false;
   const meetingRegex = /meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}/i;
   return meetingRegex.test(url);
+}
+
+// Inject content script into the tab if it's a Meet meeting
+function injectContentScriptIfNeeded(tabId, url) {
+  if (!isGoogleMeetMeetingUrl(url)) return;
+  
+  // Don't inject if we have a pending injection for this tab
+  if (pendingInjections[tabId]) return;
+  
+  console.log(`Injecting content script into tab ${tabId}`);
+  pendingInjections[tabId] = true;
+  
+  // Execute the content script
+  chrome.scripting.executeScript({
+    target: { tabId },
+    files: ['content.js']
+  })
+  .then(() => {
+    console.log(`Content script successfully injected into tab ${tabId}`);
+    delete pendingInjections[tabId];
+    
+    // Manually trigger initialization after a delay
+    setTimeout(() => {
+      chrome.tabs.sendMessage(tabId, { action: 'forceInitialize' })
+        .catch(err => console.log("Couldn't send forceInitialize:", err));
+    }, 1000);
+  })
+  .catch(error => {
+    console.error(`Error injecting content script into tab ${tabId}:`, error);
+    delete pendingInjections[tabId];
+  });
 }
 
 // Listen for messages from the content script
@@ -56,6 +88,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // Listen for tab updates to detect Google Meet pages
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  // When the tab is done loading
   if (changeInfo.status === 'complete' && tab.url) {
     console.log("Tab updated:", tab.url);
     
@@ -63,14 +96,15 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
       console.log("Google Meet meeting detected in tab:", tabId);
       sendDebugMessage('Google Meet meeting detected in tab ' + tabId);
       
-      // Wait a moment for the page to fully initialize
-      setTimeout(() => {
-        chrome.tabs.sendMessage(tabId, { action: 'startRecording' })
-          .catch(err => {
-            console.error("Error starting recording:", err);
-          });
-      }, 3000);
+      // Inject content script or initialize if already injected
+      injectContentScriptIfNeeded(tabId, tab.url);
     }
+  }
+  
+  // Also check on URL changes (for SPAs)
+  if (changeInfo.url && isGoogleMeetMeetingUrl(changeInfo.url)) {
+    console.log("URL changed to Google Meet meeting in tab:", tabId);
+    injectContentScriptIfNeeded(tabId, changeInfo.url);
   }
 });
 
@@ -81,6 +115,9 @@ chrome.tabs.onRemoved.addListener((tabId) => {
     sendDebugMessage('Tab closed, saving transcript');
     saveTranscriptToStorage(currentTranscript);
   }
+  
+  // Clean up any pending injections
+  delete pendingInjections[tabId];
 });
 
 function saveTranscriptToStorage(text) {
@@ -124,4 +161,21 @@ function saveTranscriptToStorage(text) {
 
 function openTranscriptsPage() {
   chrome.tabs.create({ url: 'transcripts.html' });
-} 
+}
+
+// Listen for runtime install or update events
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason === 'install' || details.reason === 'update') {
+    console.log("Extension installed or updated. Checking for active Google Meet tabs...");
+    
+    // Find all tabs with Google Meet meetings and inject content script
+    chrome.tabs.query({url: "https://meet.google.com/*"}, (tabs) => {
+      for (const tab of tabs) {
+        if (isGoogleMeetMeetingUrl(tab.url)) {
+          console.log(`Found active Google Meet tab: ${tab.id}. Injecting content script...`);
+          injectContentScriptIfNeeded(tab.id, tab.url);
+        }
+      }
+    });
+  }
+}); 
