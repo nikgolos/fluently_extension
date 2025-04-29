@@ -8,6 +8,81 @@ let hasReportedFinalTranscript = false;
 let meetingEndCheckInterval = null;
 let meetingDetectionInterval = null;
 let startTime = null;
+let sessionId = null;
+let autoSaveInterval = null;
+let lastSavedLength = 0;
+
+// Function to generate a unique session ID
+function generateSessionId() {
+  return 'meet-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
+}
+
+// Function to get current meeting code from URL
+function getMeetingCode() {
+  const url = window.location.href;
+  const meetRegex = /meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3})/i;
+  const match = url.match(meetRegex);
+  return match && match[1] ? match[1] : 'unknown-meeting';
+}
+
+// Function to save transcript segments to chrome.storage
+function saveTranscriptSegment(force = false) {
+  if (!isRecording || !lastTranscript) return;
+  
+  // Only save if we have new content or force is true
+  if (lastTranscript.length <= lastSavedLength && !force) return;
+  
+  const now = new Date();
+  console.log(`Saving transcript segment (${lastTranscript.length} chars, last saved: ${lastSavedLength} chars)`);
+  
+  const segment = {
+    sessionId: sessionId,
+    meetingCode: getMeetingCode(),
+    timestamp: now.toISOString(),
+    formattedTime: now.toLocaleTimeString(),
+    text: lastTranscript,
+    isComplete: false
+  };
+  
+  // Update last saved length
+  lastSavedLength = lastTranscript.length;
+  
+  const data = {};
+  data[`transcript_segment_${sessionId}`] = segment;
+  data['latest_session_id'] = sessionId;
+  
+  // Save to chrome.storage
+  chrome.storage.local.set(data, () => {
+    console.log('Transcript segment saved to chrome.storage');
+  });
+}
+
+// Function to start auto-saving segments
+function startAutoSave() {
+  if (autoSaveInterval) {
+    clearInterval(autoSaveInterval);
+  }
+  
+  console.log("Starting auto-save every 5 seconds...");
+  
+  // Save immediately first
+  saveTranscriptSegment(true);
+  
+  autoSaveInterval = setInterval(() => {
+    saveTranscriptSegment();
+  }, 5000); // Save every 5 seconds
+}
+
+// Function to stop auto-saving
+function stopAutoSave() {
+  if (autoSaveInterval) {
+    clearInterval(autoSaveInterval);
+    autoSaveInterval = null;
+  }
+  
+  // Final save with force
+  saveTranscriptSegment(true);
+}
 
 // Function to check if we're on a Google Meet meeting page with correct URL pattern
 function isGoogleMeetPage() {
@@ -76,8 +151,20 @@ function isMeetingActive() {
     document.querySelector('.lAqQo'), // Meeting ended screen
     document.querySelector('[aria-label="Rejoin"]'), // Rejoin button
     document.querySelector('[aria-label="Return to home screen"]'), // Return button after meeting
-    document.querySelector('.NzPR9b') // Meeting ended message container
+    document.querySelector('.NzPR9b'), // Meeting ended message container
+    document.querySelector('[aria-label*="left the meeting"]'), // Left meeting notification
+    document.querySelector('[jsname="r4nke"]'), // Meeting ended container
+    document.querySelector('[jsname="VnjFcf"]') // Post-meeting screen
   ];
+  
+  // Log which indicators we found for debugging
+  const foundIndicators = meetingEndedIndicators
+    .map((el, index) => el ? index : -1)
+    .filter(i => i >= 0);
+  
+  if (foundIndicators.length > 0) {
+    console.log(`Meeting end indicators found: ${foundIndicators.join(', ')}`);
+  }
   
   // If any of these elements exist, the meeting has ended
   const meetingEnded = meetingEndedIndicators.some(element => element !== null);
@@ -85,10 +172,54 @@ function isMeetingActive() {
   if (meetingEnded && isRecording) {
     console.log("Meeting has ended, stopping recording");
     stopRecording();
+    
+    // Explicitly signal to save the transcript
+    if (lastTranscript && !hasReportedFinalTranscript) {
+      saveTranscriptOnMeetingEnd();
+    }
+    
     return false;
   }
   
   return !meetingEnded;
+}
+
+// Function to explicitly save transcript when meeting ends
+function saveTranscriptOnMeetingEnd() {
+  console.log('Meeting ended, explicitly saving transcript:', lastTranscript);
+  hasReportedFinalTranscript = true;
+  
+  // Mark the current segment as complete
+  const segment = {
+    sessionId: sessionId,
+    meetingCode: getMeetingCode(),
+    timestamp: new Date().toISOString(),
+    formattedTime: new Date().toLocaleTimeString(),
+    text: lastTranscript,
+    isComplete: true
+  };
+  
+  // Save the final state
+  const data = {};
+  data[`transcript_segment_${sessionId}`] = segment;
+  data['latest_session_id'] = sessionId;
+  data['latest_complete_session'] = sessionId;
+  
+  chrome.storage.local.set(data);
+  
+  // Also try to send via messages
+  chrome.runtime.sendMessage({
+    type: 'meetingEnded',
+    sessionId: sessionId,
+    text: lastTranscript.trim()
+  });
+  
+  // Also send a regular finalTranscript message as a backup
+  chrome.runtime.sendMessage({
+    type: 'finalTranscript',
+    sessionId: sessionId,
+    text: lastTranscript.trim()
+  });
 }
 
 // Initialize and auto-start on Google Meet
@@ -177,16 +308,27 @@ function startMeetingEndDetection() {
     clearInterval(meetingEndCheckInterval);
   }
   
+  console.log("Starting meeting end detection...");
+  
   meetingEndCheckInterval = setInterval(() => {
-    if (!isMeetingActive() && isRecording) {
+    const isActive = isMeetingActive();
+    console.log(`Meeting end check: active=${isActive}, recording=${isRecording}`);
+    
+    if (!isActive && isRecording) {
       console.log("Meeting end detected, stopping recording");
       stopRecording();
+      
+      // Explicitly save transcript
+      if (lastTranscript && !hasReportedFinalTranscript) {
+        saveTranscriptOnMeetingEnd();
+      }
+      
       chrome.runtime.sendMessage({
         type: 'debug',
-        text: 'Meeting ended, recording stopped'
+        text: 'Meeting ended, recording stopped and transcript saved'
       });
     }
-  }, 5000); // Check every 5 seconds
+  }, 3000); // Check every 3 seconds instead of 5
 }
 
 // Run initialization
@@ -230,10 +372,15 @@ new MutationObserver(() => {
       startMeetingEndDetection();
     }
     
-    // If meeting ended while recording, stop recording
+    // If meeting ended while recording, stop recording and save transcript
     if (!isActive && isRecording) {
       console.log("Meeting end detected via DOM change!");
       stopRecording();
+      
+      // Explicitly save transcript
+      if (lastTranscript && !hasReportedFinalTranscript) {
+        saveTranscriptOnMeetingEnd();
+      }
     }
   }
 }).observe(document.body, {childList: true, subtree: true});
@@ -317,12 +464,20 @@ function startRecording() {
     // First, clean up any existing recognition instance
     cleanupRecognition();
     
-    // Reset flags
+    // Reset flags and initialize
     hasReportedFinalTranscript = false;
     lastTranscript = '';
+    lastSavedLength = 0;
+    
+    // Generate a new session ID for this recording
+    sessionId = generateSessionId();
+    console.log(`New recording session started with ID: ${sessionId}`);
     
     // Set start time
     startTime = new Date();
+    
+    // Start auto-saving
+    startAutoSave();
 
     // Check if browser supports Web Speech API
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -373,12 +528,17 @@ function startRecording() {
         lastTranscript = lastTranscript + ' ' + timestamp + finalTranscript;
         chrome.runtime.sendMessage({
           type: 'transcriptUpdate',
+          sessionId: sessionId,
           text: lastTranscript,
           isFinal: true
         });
+        
+        // Save on significant transcript updates
+        saveTranscriptSegment();
       } else if (interimTranscript) {
         chrome.runtime.sendMessage({
           type: 'transcriptUpdate',
+          sessionId: sessionId,
           text: interimTranscript,
           isFinal: false
         });
@@ -457,6 +617,7 @@ function startRecording() {
           console.log('Reporting final transcript:', lastTranscript);
           chrome.runtime.sendMessage({
             type: 'finalTranscript',
+            sessionId: sessionId,
             text: lastTranscript.trim()
           });
         }
@@ -476,14 +637,21 @@ function startRecording() {
 function stopRecording() {
   console.log("Stopping recording...");
   
+  // Stop auto-save
+  stopAutoSave();
+  
   // Report the final transcript
   if (lastTranscript && !hasReportedFinalTranscript) {
     console.log('Reporting final transcript:', lastTranscript);
     chrome.runtime.sendMessage({
       type: 'finalTranscript',
+      sessionId: sessionId,
       text: lastTranscript.trim()
     });
     hasReportedFinalTranscript = true;
+    
+    // Also save as complete session
+    saveTranscriptOnMeetingEnd();
   }
   
   // Cleanup
@@ -505,12 +673,39 @@ function updateRecordingStatus() {
 }
 
 // Clean up on unload
-window.addEventListener('beforeunload', () => {
+window.addEventListener('beforeunload', (event) => {
+  console.log("Window beforeunload event triggered");
+  
+  // Stop intervals
   if (meetingEndCheckInterval) {
     clearInterval(meetingEndCheckInterval);
   }
   if (meetingDetectionInterval) {
     clearInterval(meetingDetectionInterval);
   }
+  if (autoSaveInterval) {
+    clearInterval(autoSaveInterval);
+  }
+  
+  // Make sure to save transcript when window is closed
+  if (isRecording && lastTranscript && !hasReportedFinalTranscript) {
+    console.log("Window closing while recording, saving transcript");
+    saveTranscriptOnMeetingEnd();
+  }
+  
   stopRecording();
+});
+
+// Also listen for page visibility changes
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && isRecording) {
+    console.log("Page hidden while recording, checking if meeting ended");
+    
+    // Force a check of meeting status
+    const isActive = isMeetingActive();
+    if (!isActive && lastTranscript && !hasReportedFinalTranscript) {
+      console.log("Meeting not active and page hidden, saving transcript");
+      saveTranscriptOnMeetingEnd();
+    }
+  }
 }); 

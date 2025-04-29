@@ -127,7 +127,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (!response.isMeetingActive) {
           updateStatus('Meeting has ended', false);
-          logDebug('The meeting has ended. Please join a new meeting to start recording.');
+          logDebug('The meeting has ended. If you had a recording, the transcript will be saved automatically.');
+          startButton.disabled = true;
           return;
         }
         
@@ -231,19 +232,22 @@ document.addEventListener('DOMContentLoaded', () => {
       logDebug(message.text);
       
       // Update UI based on debug messages
-      if (message.text.includes('Saving transcription')) {
+      if (message.text.includes('Saving transcription') || message.text.includes('saving transcript')) {
         updateStatus('Saving transcript...');
       } else if (message.text.includes('Transcript saved')) {
         updateStatus('Transcript saved');
         logDebug('Transcript saved successfully!');
       } else if (message.text.includes('Meeting ended')) {
-        updateStatus('Meeting has ended');
+        updateStatus('Meeting has ended', false);
         startButton.disabled = true;
         isMeetingActive = false;
         isParticipating = false;
+        logDebug('Meeting has ended. Transcript will be saved automatically.');
       } else if (message.text.includes('Meeting detected - Recording started automatically')) {
         updateStatus('Recording in progress', true);
         logDebug('Meeting detected - Recording started automatically!');
+      } else if (message.text.includes('Duplicate transcript detected')) {
+        logDebug('Note: This transcript was already saved previously.');
       }
     } else if (message.type === 'error') {
       logDebug('Error: ' + message.error);

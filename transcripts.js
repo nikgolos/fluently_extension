@@ -9,6 +9,58 @@ document.addEventListener('DOMContentLoaded', () => {
   
   let currentTranscript = null;
   
+  // Check for unfinished sessions
+  function checkForUnfinishedSessions() {
+    chrome.storage.local.get(['latest_session_id', 'latest_complete_session'], (result) => {
+      if (result.latest_session_id && result.latest_session_id !== result.latest_complete_session) {
+        // There might be an unfinished session
+        const sessionKey = `transcript_segment_${result.latest_session_id}`;
+        chrome.storage.local.get([sessionKey], (data) => {
+          if (data[sessionKey] && !data[sessionKey].isComplete) {
+            console.log('Found unfinished session:', result.latest_session_id);
+            // Show a recovery message
+            const recoveryNote = document.createElement('div');
+            recoveryNote.className = 'recovery-note';
+            recoveryNote.innerHTML = `
+              <p>There appears to be an unfinished transcript session.</p>
+              <button id="recoverSessionBtn">Recover Latest Session</button>
+            `;
+            document.querySelector('.toolbar').after(recoveryNote);
+            
+            // Handle recovery button
+            document.getElementById('recoverSessionBtn').addEventListener('click', () => {
+              const segment = data[sessionKey];
+              // Create a completed transcript from this segment
+              const transcript = {
+                id: segment.sessionId,
+                sessionId: segment.sessionId,
+                timestamp: segment.timestamp,
+                formattedDate: segment.formattedDate || new Date().toLocaleString(),
+                meetingId: segment.meetingCode || 'unknown-meeting',
+                text: segment.text,
+                recovered: true
+              };
+              
+              // Add to transcripts array
+              chrome.storage.local.get(['transcripts'], (result) => {
+                const transcripts = result.transcripts || [];
+                transcripts.push(transcript);
+                chrome.storage.local.set({ 
+                  transcripts: transcripts,
+                  'latest_complete_session': segment.sessionId
+                }, () => {
+                  recoveryNote.innerHTML = '<p>Session recovered successfully!</p>';
+                  setTimeout(() => recoveryNote.remove(), 3000);
+                  loadTranscripts();
+                });
+              });
+            });
+          }
+        });
+      }
+    });
+  }
+  
   // Load all saved transcripts
   function loadTranscripts() {
     chrome.storage.local.get(['transcripts'], (result) => {
@@ -32,12 +84,14 @@ document.addEventListener('DOMContentLoaded', () => {
       // Add each transcript to the list
       transcripts.forEach(transcript => {
         const preview = transcript.text.substring(0, 100) + (transcript.text.length > 100 ? '...' : '');
+        const meetingInfo = transcript.meetingId ? ` - Meeting: ${transcript.meetingId}` : '';
+        const recoveredBadge = transcript.recovered ? '<span class="recovered-badge">Recovered</span>' : '';
         
         const transcriptItem = document.createElement('div');
         transcriptItem.className = 'transcript-item';
         transcriptItem.dataset.id = transcript.id;
         transcriptItem.innerHTML = `
-          <div class="transcript-date">${transcript.formattedDate}</div>
+          <div class="transcript-date">${transcript.formattedDate}${meetingInfo} ${recoveredBadge}</div>
           <div class="transcript-preview">${preview}</div>
         `;
         
@@ -46,7 +100,8 @@ document.addEventListener('DOMContentLoaded', () => {
           currentTranscript = transcript;
           
           // Update the view
-          transcriptTitle.textContent = `Transcript from ${transcript.formattedDate}`;
+          const meetingLabel = transcript.meetingId ? `<span class="meeting-id">Meeting: ${transcript.meetingId}</span>` : '';
+          transcriptTitle.innerHTML = `Transcript from ${transcript.formattedDate} ${meetingLabel}`;
           transcriptTime.textContent = `Recorded at ${new Date(transcript.timestamp).toLocaleTimeString()}`;
           transcriptContent.textContent = transcript.text;
           
@@ -96,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .replace(/[:.]/g, '-');
     
     // Create CSV content
-    const csvContent = `Timestamp,Transcript\n${currentTranscript.timestamp},"${currentTranscript.text.replace(/"/g, '""')}"`;
+    const csvContent = `Timestamp,Meeting ID,Transcript\n${currentTranscript.timestamp},"${currentTranscript.meetingId || ''}","${currentTranscript.text.replace(/"/g, '""')}"`;
     
     // Create download link
     const encodedUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
@@ -111,6 +166,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Clean up
     document.body.removeChild(link);
   });
+  
+  // Check for unfinished sessions first
+  checkForUnfinishedSessions();
   
   // Load transcripts when the page loads
   loadTranscripts();

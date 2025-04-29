@@ -3,6 +3,7 @@ console.log("Background script loaded");
 let currentTranscript = '';
 let isRecordingStopped = false;
 let pendingInjections = {};
+let currentSessionId = null;
 
 function sendDebugMessage(message) {
   console.log("DEBUG:", message);
@@ -54,15 +55,24 @@ function injectContentScriptIfNeeded(tabId, url) {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log("Message received in background:", message);
   
+  if (message.sessionId) {
+    currentSessionId = message.sessionId;
+  }
+  
   if (message.type === 'finalTranscript') {
     currentTranscript = message.text;
     sendDebugMessage('Received transcript update');
     
     // Only save when recording is explicitly stopped
     if (isRecordingStopped) {
-      saveTranscriptToStorage(currentTranscript);
+      saveTranscriptToStorage(currentTranscript, sender, message.sessionId);
       isRecordingStopped = false; // Reset flag after saving
     }
+  } else if (message.type === 'meetingEnded') {
+    // This is a dedicated message for when a meeting ends, save immediately
+    console.log("Meeting ended message received, saving transcript immediately");
+    currentTranscript = message.text;
+    saveTranscriptToStorage(currentTranscript, sender, message.sessionId);
   } else if (message.type === 'error') {
     sendDebugMessage('Error: ' + message.error);
   } else if (message.type === 'recordingStatus') {
@@ -73,14 +83,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
   } else if (message.type === 'debug' && message.text.includes('Meeting ended') && currentTranscript) {
     // Auto-save transcript when meeting ends
-    sendDebugMessage('Meeting ended, saving transcript');
-    isRecordingStopped = true;
-    setTimeout(() => {
-      if (currentTranscript && isRecordingStopped) {
-        saveTranscriptToStorage(currentTranscript);
-        isRecordingStopped = false;
-      }
-    }, 1000);
+    sendDebugMessage('Meeting ended detected via debug message, saving transcript');
+    saveTranscriptToStorage(currentTranscript, sender, currentSessionId);
   } else if (message.type === 'openTranscriptsPage') {
     openTranscriptsPage();
   }
@@ -110,17 +114,59 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 // Listen for tab close or navigation away from meeting
 chrome.tabs.onRemoved.addListener((tabId) => {
-  // If we have a transcript and tab is closed, save it
-  if (currentTranscript) {
-    sendDebugMessage('Tab closed, saving transcript');
-    saveTranscriptToStorage(currentTranscript);
-  }
+  // Check for any in-progress session
+  chrome.storage.local.get(['latest_session_id'], (result) => {
+    if (result.latest_session_id) {
+      // Try to load and save any unfinished transcript
+      chrome.storage.local.get([`transcript_segment_${result.latest_session_id}`], (data) => {
+        const segment = data[`transcript_segment_${result.latest_session_id}`];
+        if (segment && !segment.isComplete) {
+          console.log('Found unfinished transcript segment, saving as complete');
+          saveUnfinishedSession(segment);
+        }
+      });
+    }
+  });
   
   // Clean up any pending injections
   delete pendingInjections[tabId];
 });
 
-function saveTranscriptToStorage(text) {
+// Function to handle saving unfinished transcripts when tab closes
+function saveUnfinishedSession(segment) {
+  if (!segment || !segment.text) return;
+  
+  // Mark as complete
+  segment.isComplete = true;
+  
+  // Update the segment
+  chrome.storage.local.set({
+    [`transcript_segment_${segment.sessionId}`]: segment,
+    'latest_complete_session': segment.sessionId
+  }, () => {
+    console.log('Unfinished transcript marked as complete');
+    // Also create a permanent copy in the transcripts array
+    saveTranscriptToStorage(segment.text, null, segment.sessionId, segment.meetingCode);
+  });
+}
+
+// Get meeting ID from current URL or sender info
+function getMeetingIdFromUrl(sender) {
+  // If we have sender info with a URL, use that
+  if (sender && sender.url) {
+    const url = sender.url;
+    const meetRegex = /meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3})/i;
+    const match = url.match(meetRegex);
+    if (match && match[1]) {
+      return match[1]; // Return the meeting ID from the source tab
+    }
+  }
+  
+  // Otherwise, just use a timestamp as identifier
+  return 'meet-' + new Date().toISOString().replace(/[:.-]/g, '');
+}
+
+function saveTranscriptToStorage(text, sender, sessionId, meetingCode) {
   if (!text || text.trim() === '') {
     sendDebugMessage('No transcript to save');
     return;
@@ -129,18 +175,37 @@ function saveTranscriptToStorage(text) {
   try {
     const timestamp = new Date().toISOString();
     const formattedDate = new Date().toLocaleString();
+    const meetId = meetingCode || getMeetingIdFromUrl(sender);
     
     // Create transcript object
     const transcriptEntry = {
-      id: Date.now().toString(),
+      id: sessionId || Date.now().toString(),
+      sessionId: sessionId || 'session-' + Date.now(),
       timestamp: timestamp,
       formattedDate: formattedDate,
+      meetingId: meetId,
       text: text
     };
+    
+    // Log what we're saving
+    console.log('Saving transcript to storage:', transcriptEntry);
     
     // Save to chrome.storage.local
     chrome.storage.local.get(['transcripts'], (result) => {
       const transcripts = result.transcripts || [];
+      
+      // Check if we might be saving a duplicate by comparing text (unlikely but possible)
+      const isDuplicate = transcripts.some(t => 
+        (t.sessionId === transcriptEntry.sessionId) || 
+        (t.text === text && new Date(t.timestamp) > new Date(Date.now() - 1000 * 60))
+      );
+      
+      if (isDuplicate) {
+        console.log('Duplicate transcript detected, not saving again');
+        sendDebugMessage('Duplicate transcript detected, not saving again');
+        return;
+      }
+      
       transcripts.push(transcriptEntry);
       
       chrome.storage.local.set({ transcripts: transcripts }, () => {
@@ -156,6 +221,19 @@ function saveTranscriptToStorage(text) {
   } catch (error) {
     console.error('Error saving transcript:', error);
     sendDebugMessage('Error saving transcript: ' + error.message);
+    
+    // Attempt backup saving to localStorage in case chrome.storage fails
+    try {
+      const backupData = {
+        timestamp: new Date().toISOString(),
+        sessionId: sessionId || 'session-' + Date.now(),
+        text: text
+      };
+      localStorage.setItem('transcript_backup_' + Date.now(), JSON.stringify(backupData));
+      console.log('Backup transcript saved to localStorage');
+    } catch (backupError) {
+      console.error('Backup saving also failed:', backupError);
+    }
   }
 }
 
