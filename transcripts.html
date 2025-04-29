@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Saved Transcripts</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    h1 {
+      color: #4285f4;
+      margin-bottom: 20px;
+    }
+    .transcript-list {
+      margin-bottom: 20px;
+    }
+    .transcript-item {
+      padding: 10px;
+      background-color: white;
+      border-left: 4px solid #4285f4;
+      margin-bottom: 10px;
+      cursor: pointer;
+      border-radius: 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      transition: all 0.2s;
+    }
+    .transcript-item:hover {
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      transform: translateY(-2px);
+    }
+    .transcript-date {
+      font-weight: bold;
+      color: #4285f4;
+    }
+    .transcript-preview {
+      color: #666;
+      margin-top: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+    .transcript-view {
+      background-color: white;
+      padding: 20px;
+      border-radius: 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      margin-top: 20px;
+    }
+    .transcript-content {
+      white-space: pre-wrap;
+      line-height: 1.5;
+    }
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    button {
+      padding: 8px 16px;
+      cursor: pointer;
+      background-color: #4285f4;
+      color: white;
+      border: none;
+      border-radius: 4px;
+    }
+    button:hover {
+      background-color: #3367d6;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+    .transcript-time {
+      font-size: 0.8em;
+      color: #888;
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Saved Transcripts</h1>
+  
+  <div class="toolbar">
+    <button id="clearAllBtn">Clear All Transcripts</button>
+    <button id="downloadCurrentBtn" disabled>Download Current Transcript</button>
+  </div>
+  
+  <div class="transcript-list" id="transcriptList">
+    <!-- Transcript items will be added here -->
+    <div class="empty-state">Loading transcripts...</div>
+  </div>
+  
+  <div class="transcript-view" id="transcriptView" style="display: none;">
+    <h2 id="transcriptTitle">Transcript</h2>
+    <div class="transcript-time" id="transcriptTime"></div>
+    <hr>
+    <div class="transcript-content" id="transcriptContent"></div>
+  </div>
+
+  <script src="transcripts.js"></script>
+</body>
+</html> 

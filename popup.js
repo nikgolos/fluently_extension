@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   const startButton = document.getElementById('startButton');
   const stopButton = document.getElementById('stopButton');
+  const viewTranscriptsButton = document.getElementById('viewTranscriptsButton');
   const debugArea = document.getElementById('debugArea');
   const statusDiv = document.getElementById('status');
   let currentTranscript = '';
@@ -154,6 +155,11 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   });
+  
+  // View transcripts button handler
+  viewTranscriptsButton.addEventListener('click', () => {
+    chrome.runtime.sendMessage({ type: 'openTranscriptsPage' });
+  });
 
   // Listen for messages from the content script and background
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -172,7 +178,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Update UI based on debug messages
       if (message.text.includes('Saving transcription')) {
         updateStatus('Saving transcript...');
-      } else if (message.text.includes('CSV file saved')) {
+      } else if (message.text.includes('Transcript saved')) {
         updateStatus('Transcript saved');
         logDebug('Transcript saved successfully!');
       } else if (message.text.includes('Meeting ended')) {

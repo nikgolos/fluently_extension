@@ -28,7 +28,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     
     // Only save when recording is explicitly stopped
     if (isRecordingStopped) {
-      saveToCSV(currentTranscript);
+      saveTranscriptToStorage(currentTranscript);
       isRecordingStopped = false; // Reset flag after saving
     }
   } else if (message.type === 'error') {
@@ -45,10 +45,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     isRecordingStopped = true;
     setTimeout(() => {
       if (currentTranscript && isRecordingStopped) {
-        saveToCSV(currentTranscript);
+        saveTranscriptToStorage(currentTranscript);
         isRecordingStopped = false;
       }
     }, 1000);
+  } else if (message.type === 'openTranscriptsPage') {
+    openTranscriptsPage();
   }
 });
 
@@ -77,41 +79,49 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   // If we have a transcript and tab is closed, save it
   if (currentTranscript) {
     sendDebugMessage('Tab closed, saving transcript');
-    saveToCSV(currentTranscript);
+    saveTranscriptToStorage(currentTranscript);
   }
 });
 
-function saveToCSV(text) {
+function saveTranscriptToStorage(text) {
   if (!text || text.trim() === '') {
     sendDebugMessage('No transcript to save');
     return;
   }
   
   try {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `transcript_${timestamp}.csv`;
+    const timestamp = new Date().toISOString();
+    const formattedDate = new Date().toLocaleString();
     
-    // Create CSV content
-    const csvContent = `Timestamp,Transcript\n${timestamp},"${text.replace(/"/g, '""')}"`;
+    // Create transcript object
+    const transcriptEntry = {
+      id: Date.now().toString(),
+      timestamp: timestamp,
+      formattedDate: formattedDate,
+      text: text
+    };
     
-    // Convert to base64
-    const base64Content = btoa(unescape(encodeURIComponent(csvContent)));
-    
-    // Create download URL
-    const dataUrl = `data:text/csv;base64,${base64Content}`;
-    
-    sendDebugMessage('Saving transcription to CSV...');
-    chrome.downloads.download({
-      url: dataUrl,
-      filename: filename,
-      saveAs: true
+    // Save to chrome.storage.local
+    chrome.storage.local.get(['transcripts'], (result) => {
+      const transcripts = result.transcripts || [];
+      transcripts.push(transcriptEntry);
+      
+      chrome.storage.local.set({ transcripts: transcripts }, () => {
+        sendDebugMessage('Transcript saved to storage');
+        
+        // Notify user that the transcript is ready to view
+        chrome.tabs.create({ url: 'transcripts.html' });
+        
+        // Clear current transcript after saving
+        currentTranscript = '';
+      });
     });
-    sendDebugMessage('CSV file saved successfully!');
-    
-    // Clear transcript after saving
-    currentTranscript = '';
   } catch (error) {
-    console.error('Error saving CSV:', error);
-    sendDebugMessage('Error saving CSV: ' + error.message);
+    console.error('Error saving transcript:', error);
+    sendDebugMessage('Error saving transcript: ' + error.message);
   }
+}
+
+function openTranscriptsPage() {
+  chrome.tabs.create({ url: 'transcripts.html' });
 } 

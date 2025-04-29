@@ -6,6 +6,7 @@ const MAX_RETRIES = 3;
 let autoStarted = false;
 let hasReportedFinalTranscript = false;
 let meetingEndCheckInterval = null;
+let startTime = null;
 
 // Function to check if we're on a Google Meet meeting page with correct URL pattern
 function isGoogleMeetPage() {
@@ -164,6 +165,10 @@ function startRecording() {
     
     // Reset flags
     hasReportedFinalTranscript = false;
+    lastTranscript = '';
+    
+    // Set start time
+    startTime = new Date();
 
     // Check if browser supports Web Speech API
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -205,9 +210,13 @@ function startRecording() {
         }
       }
 
-      // Send both final and interim results
+      // Add timestamp to each segment of final transcript
       if (finalTranscript) {
-        lastTranscript = lastTranscript + ' ' + finalTranscript;
+        const now = new Date();
+        const timeSinceStart = ((now - startTime) / 1000).toFixed(1);
+        const timestamp = `[${timeSinceStart}s] `;
+        
+        lastTranscript = lastTranscript + ' ' + timestamp + finalTranscript;
         chrome.runtime.sendMessage({
           type: 'transcriptUpdate',
           text: lastTranscript,
@@ -248,80 +257,61 @@ function startRecording() {
           setTimeout(() => {
             chrome.runtime.sendMessage({
               type: 'debug',
-              text: `Retrying recording (attempt ${retryCount}/${MAX_RETRIES})`
+              text: `Restarting recognition after error (attempt ${retryCount}/${MAX_RETRIES})`
             });
-            cleanupRecognition();
             startRecording();
           }, 1000);
         } else {
+          isRecording = false;
           chrome.runtime.sendMessage({
             type: 'error',
-            error: 'Failed to start recording after multiple attempts. Please check if another extension is using the microphone.'
+            error: `Speech recognition failed after ${MAX_RETRIES} retries. Please refresh the page.`
           });
+          updateRecordingStatus();
         }
       } else {
-        chrome.runtime.sendMessage({
-          type: 'error',
-          error: event.error
-        });
-      }
-    };
-
-    recognition.onend = () => {
-      console.log("Recognition ended");
-      const wasRecording = isRecording;
-      isRecording = false;
-      updateRecordingStatus();
-      
-      // Only send final transcript once when recording is actually stopped
-      if (lastTranscript && wasRecording && !hasReportedFinalTranscript) {
-        console.log("Sending final transcript");
-        chrome.runtime.sendMessage({
-          type: 'finalTranscript',
-          text: lastTranscript
-        });
-        hasReportedFinalTranscript = true;
-      }
-
-      // Auto-restart if we're still on a Google Meet page with active meeting
-      // Only if we were previously recording and haven't been explicitly stopped
-      if (isGoogleMeetPage() && isMeetingActive() && retryCount < MAX_RETRIES && wasRecording && !hasReportedFinalTranscript) {
+        // For other errors, try to restart recognition
         setTimeout(() => {
-          console.log("Auto-restarting recording on Google Meet");
-          cleanupRecognition();
-          startRecording();
+          if (isRecording) {
+            chrome.runtime.sendMessage({
+              type: 'debug',
+              text: 'Attempting to restart recognition after error'
+            });
+            recognition.start();
+          }
         }, 1000);
       }
     };
 
-    // Request microphone permission explicitly
-    navigator.mediaDevices.getUserMedia({ audio: true })
-      .then(() => {
+    recognition.onend = () => {
+      console.log('Recognition ended');
+      // If we're still supposed to be recording, restart
+      if (isRecording) {
+        console.log('Restarting recognition...');
         try {
           recognition.start();
-          console.log("Recognition.start() called successfully");
         } catch (e) {
-          console.error("Error starting recognition:", e);
-          if (e.message.includes('already started')) {
-            cleanupRecognition();
-            setTimeout(() => {
-              startRecording();
-            }, 1000);
-          } else {
-            throw e;
-          }
+          console.error('Error restarting recognition:', e);
         }
-      })
-      .catch(error => {
-        console.error("Microphone permission error:", error);
-        chrome.runtime.sendMessage({
-          type: 'error',
-          error: 'Microphone permission denied: ' + error.message
-        });
-      });
+      } else {
+        // We're intentionally stopping, send the final transcript
+        console.log('Recording stopped');
+        
+        if (lastTranscript && !hasReportedFinalTranscript) {
+          hasReportedFinalTranscript = true;
+          
+          console.log('Reporting final transcript:', lastTranscript);
+          chrome.runtime.sendMessage({
+            type: 'finalTranscript',
+            text: lastTranscript.trim()
+          });
+        }
+      }
+    };
 
+    recognition.start();
   } catch (error) {
-    console.error('Error starting speech recognition:', error);
+    console.error('Error starting recording:', error);
     chrome.runtime.sendMessage({
       type: 'error',
       error: error.message
@@ -331,21 +321,26 @@ function startRecording() {
 
 function stopRecording() {
   console.log("Stopping recording...");
-  // Mark that we're intentionally stopping (not auto-restarting)
-  hasReportedFinalTranscript = true;
+  
+  // Report the final transcript
+  if (lastTranscript && !hasReportedFinalTranscript) {
+    console.log('Reporting final transcript:', lastTranscript);
+    chrome.runtime.sendMessage({
+      type: 'finalTranscript',
+      text: lastTranscript.trim()
+    });
+    hasReportedFinalTranscript = true;
+  }
+  
+  // Cleanup
   cleanupRecognition();
   updateRecordingStatus();
   
-  // Send final transcript when explicitly stopped
-  if (lastTranscript) {
-    console.log("Sending final transcript after explicit stop");
-    chrome.runtime.sendMessage({
-      type: 'finalTranscript',
-      text: lastTranscript
-    });
-    // Clear the transcript after sending
-    lastTranscript = '';
-  }
+  // Send debug message
+  chrome.runtime.sendMessage({
+    type: 'debug',
+    text: 'Recording stopped'
+  });
 }
 
 function updateRecordingStatus() {
