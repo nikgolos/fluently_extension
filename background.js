@@ -177,47 +177,140 @@ function saveTranscriptToStorage(text, sender, sessionId, meetingCode) {
     const formattedDate = new Date().toLocaleString();
     const meetId = meetingCode || getMeetingIdFromUrl(sender);
     
-    // Create transcript object
-    const transcriptEntry = {
-      id: sessionId || Date.now().toString(),
-      sessionId: sessionId || 'session-' + Date.now(),
-      timestamp: timestamp,
-      formattedDate: formattedDate,
-      meetingId: meetId,
-      text: text
-    };
+    // Check if transcript text has overlapping timestamps and fix them
+    let cleanedText = text;
+    let timestampsCleaned = false;
     
-    // Log what we're saving
-    console.log('Saving transcript to storage:', transcriptEntry);
+    // Use transcript_stats.js function if loaded, otherwise use a simple method
+    if (typeof TranscriptStats !== 'undefined' && typeof TranscriptStats.fixTranscriptTimestamps === 'function') {
+      console.log('Using TranscriptStats to fix timestamp overlaps');
+      cleanedText = TranscriptStats.fixTranscriptTimestamps(text);
+      timestampsCleaned = cleanedText !== text;
+    } else {
+      // Simple fix for overlapping timestamps - load and execute the function
+      console.log('TranscriptStats not loaded, using simple timestamp overlap fix');
+      
+      // Create a tab to execute the cleaning
+      chrome.tabs.create({ 
+        url: 'about:blank',
+        active: false
+      }, (tab) => {
+        // Load transcript_stats.js in the tab
+        chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['transcript_stats.js']
+        }).then(() => {
+          // Execute the fix function
+          chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: (transcriptText) => {
+              if (window.TranscriptStats && window.TranscriptStats.fixTranscriptTimestamps) {
+                return window.TranscriptStats.fixTranscriptTimestamps(transcriptText);
+              }
+              return transcriptText;
+            },
+            args: [text]
+          }).then((result) => {
+            if (result && result[0] && result[0].result) {
+              cleanedText = result[0].result;
+              timestampsCleaned = cleanedText !== text;
+              
+              // Continue with saving the cleaned transcript
+              continueWithSaving(cleanedText, timestampsCleaned);
+            } else {
+              // If something went wrong, continue with the original text
+              continueWithSaving(text, false);
+            }
+            
+            // Close the temporary tab
+            chrome.tabs.remove(tab.id);
+          });
+        });
+      });
+      
+      // Don't continue with the rest of the function - will be handled in the callback
+      return;
+    }
     
-    // Save to chrome.storage.local
-    chrome.storage.local.get(['transcripts'], (result) => {
-      const transcripts = result.transcripts || [];
+    // Continue with saving the transcript
+    continueWithSaving(cleanedText, timestampsCleaned);
+    
+    // Helper function to continue saving process
+    function continueWithSaving(finalText, wasFixed) {
+      // Create transcript object
+      const transcriptEntry = {
+        id: sessionId || Date.now().toString(),
+        sessionId: sessionId || 'session-' + Date.now(),
+        timestamp: timestamp,
+        formattedDate: formattedDate,
+        meetingId: meetId,
+        text: finalText,
+        timestampsCleaned: wasFixed
+      };
       
-      // Check if we might be saving a duplicate by comparing text (unlikely but possible)
-      const isDuplicate = transcripts.some(t => 
-        (t.sessionId === transcriptEntry.sessionId) || 
-        (t.text === text && new Date(t.timestamp) > new Date(Date.now() - 1000 * 60))
-      );
+      // Log what we're saving
+      console.log('Saving transcript to storage:', transcriptEntry);
       
-      if (isDuplicate) {
-        console.log('Duplicate transcript detected, not saving again');
-        sendDebugMessage('Duplicate transcript detected, not saving again');
-        return;
+      if (wasFixed) {
+        console.log('Timestamps were fixed in the transcript');
       }
       
-      transcripts.push(transcriptEntry);
-      
-      chrome.storage.local.set({ transcripts: transcripts }, () => {
-        sendDebugMessage('Transcript saved to storage');
+      // Save to chrome.storage.local
+      chrome.storage.local.get(['transcripts'], (result) => {
+        const transcripts = result.transcripts || [];
         
-        // Notify user that the transcript is ready to view
-        chrome.tabs.create({ url: 'transcripts.html' });
+        // Check if we might be saving a duplicate by comparing text (unlikely but possible)
+        const isDuplicate = transcripts.some(t => 
+          (t.sessionId === transcriptEntry.sessionId) || 
+          (t.text === finalText && new Date(t.timestamp) > new Date(Date.now() - 1000 * 60))
+        );
         
-        // Clear current transcript after saving
-        currentTranscript = '';
+        if (isDuplicate) {
+          console.log('Duplicate transcript detected, not saving again');
+          sendDebugMessage('Duplicate transcript detected, not saving again');
+          return;
+        }
+        
+        transcripts.push(transcriptEntry);
+        
+        chrome.storage.local.set({ transcripts: transcripts }, () => {
+          sendDebugMessage('Transcript saved to storage');
+          
+          // Calculate transcript stats
+          if (typeof TranscriptStats !== 'undefined') {
+            TranscriptStats.calculateTranscriptStats(transcriptEntry);
+          } else {
+            // Need to load the stats module first
+            chrome.tabs.create({ 
+              url: 'about:blank',
+              active: false
+            }, (tab) => {
+              // Load transcript_stats.js in the tab
+              chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                files: ['transcript_stats.js']
+              }).then(() => {
+                // Calculate stats
+                chrome.scripting.executeScript({
+                  target: { tabId: tab.id },
+                  func: calculateStats,
+                  args: [transcriptEntry]
+                }).then(() => {
+                  // Close the temporary tab
+                  chrome.tabs.remove(tab.id);
+                });
+              });
+            });
+          }
+          
+          // Notify user that the transcript is ready to view
+          chrome.tabs.create({ url: 'transcripts.html' });
+          
+          // Clear current transcript after saving
+          currentTranscript = '';
+        });
       });
-    });
+    }
   } catch (error) {
     console.error('Error saving transcript:', error);
     sendDebugMessage('Error saving transcript: ' + error.message);
@@ -234,6 +327,13 @@ function saveTranscriptToStorage(text, sender, sessionId, meetingCode) {
     } catch (backupError) {
       console.error('Backup saving also failed:', backupError);
     }
+  }
+}
+
+// Function to calculate stats for a transcript in a temporary tab
+function calculateStats(transcript) {
+  if (window.TranscriptStats) {
+    return window.TranscriptStats.calculateTranscriptStats(transcript);
   }
 }
 

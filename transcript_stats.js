@@ -1,0 +1,575 @@
+// Transcript Stats Calculator
+// This module calculates statistics for meeting transcripts
+
+// Function to fix overlapping timestamps in transcript
+function fixTranscriptTimestamps(transcriptText) {
+  if (!transcriptText) return transcriptText;
+  
+  console.log("Fixing overlapping timestamps in transcript...");
+  
+  // Extract all timestamp pairs with their positions
+  const startTimeRegex = /\[S:(\d+\.\d+)s\]/g;
+  const endTimeRegex = /\[E:(\d+\.\d+)s\]/g;
+  
+  // Store all timestamps with their positions
+  const timestamps = [];
+  let match;
+  
+  // Find all start timestamps
+  while ((match = startTimeRegex.exec(transcriptText)) !== null) {
+    timestamps.push({
+      type: 'start',
+      time: parseFloat(match[1]),
+      position: match.index,
+      length: match[0].length,
+      fullMatch: match[0]
+    });
+  }
+  
+  // Find all end timestamps
+  while ((match = endTimeRegex.exec(transcriptText)) !== null) {
+    timestamps.push({
+      type: 'end',
+      time: parseFloat(match[1]),
+      position: match.index,
+      length: match[0].length,
+      fullMatch: match[0]
+    });
+  }
+  
+  // Sort by position in the original text
+  timestamps.sort((a, b) => a.position - b.position);
+  
+  console.log("Found timestamps:", timestamps.length);
+  
+  // Find pairs and check for overlaps
+  const pairs = [];
+  const problematicPairs = [];
+  
+  for (let i = 0; i < timestamps.length - 1; i++) {
+    // Check if we have a start-end pair
+    if (timestamps[i].type === 'start' && timestamps[i+1].type === 'end') {
+      const pair = {
+        start: timestamps[i],
+        end: timestamps[i+1],
+        startTime: timestamps[i].time,
+        endTime: timestamps[i+1].time
+      };
+      
+      pairs.push(pair);
+      
+      // Check if the next start time (if exists) is before current end time
+      if (i+2 < timestamps.length && timestamps[i+2].type === 'start') {
+        const nextStart = timestamps[i+2];
+        if (nextStart.time < pair.endTime) {
+          console.log(`Found problematic overlap: End [${pair.endTime}] followed by Start [${nextStart.time}]`);
+          problematicPairs.push({
+            currentPair: pair,
+            nextStart: nextStart
+          });
+        }
+      }
+    }
+  }
+  
+  console.log("Total timestamp pairs:", pairs.length);
+  console.log("Problematic pairs:", problematicPairs.length);
+  
+  if (problematicPairs.length === 0) {
+    console.log("No problematic overlaps found, transcript is clean.");
+    return transcriptText;
+  }
+  
+  // Remove problematic pairs from the transcript
+  // We need to remove them from end to start to not mess up positions
+  problematicPairs.sort((a, b) => b.currentPair.start.position - a.currentPair.start.position);
+  
+  let cleanedTranscript = transcriptText;
+  
+  for (const problem of problematicPairs) {
+    const { currentPair, nextStart } = problem;
+    
+    // Remove both timestamps and preserve text between them
+    const startPos = currentPair.start.position;
+    const endPos = currentPair.end.position + currentPair.end.length;
+    
+    // Extract the text between the timestamps (including timestamps)
+    const textToReplace = cleanedTranscript.substring(startPos, endPos);
+    const textBetweenTimestamps = cleanedTranscript.substring(
+      startPos + currentPair.start.length, 
+      endPos - currentPair.end.length
+    ).trim();
+    
+    console.log(`Removing overlapping pair: "${textToReplace}" (keeping text: "${textBetweenTimestamps}")`);
+    
+    // Replace the entire range with just the text between timestamps
+    cleanedTranscript = cleanedTranscript.substring(0, startPos) + 
+                      (textBetweenTimestamps ? ' ' + textBetweenTimestamps + ' ' : ' ') + 
+                      cleanedTranscript.substring(endPos);
+  }
+  
+  // Normalize spaces
+  cleanedTranscript = cleanedTranscript.replace(/\s+/g, ' ').trim();
+  
+  console.log("Original transcript length:", transcriptText.length);
+  console.log("Cleaned transcript length:", cleanedTranscript.length);
+  
+  // If something went wrong and we removed all text, return the original
+  if (cleanedTranscript.length < 10 && transcriptText.length > 10) {
+    console.warn("Cleaning removed too much text, returning original transcript");
+    return transcriptText;
+  }
+  
+  return cleanedTranscript;
+}
+
+// Main function to calculate transcript statistics
+function calculateTranscriptStats(transcript) {
+  if (!transcript || !transcript.text) {
+    console.error('Invalid transcript provided for stats calculation');
+    return {
+      unique_words_amount: 0,
+      total_words: 0,
+      words_per_minute: 0,
+      meeting_length: '00h 00m 00s',
+      speaking_time: '00h 00m 00s'
+    };
+  }
+
+  console.log("Calculating stats for transcript:", transcript.id);
+  
+  // First, fix any overlapping timestamps in the transcript
+  const originalText = transcript.text;
+  const fixedText = fixTranscriptTimestamps(originalText);
+  
+  // Update the transcript text if it was fixed
+  if (fixedText !== originalText) {
+    console.log("Transcript timestamps were fixed.");
+    transcript.text = fixedText;
+    transcript.timestampsCleaned = true;
+  }
+  
+  console.log("Transcript text sample:", transcript.text.slice(0, 100) + "...");
+
+  // Calculate unique words and total words
+  const { uniqueWordsCount, totalWords } = calculateWordStats(transcript.text);
+  
+  // Validate the word counts
+  console.log("Validating word counts:", { 
+    totalWords, 
+    uniqueWordsCount, 
+    textLength: transcript.text.length,
+    hasTimestamps: transcript.text.includes('[S:') && transcript.text.includes('[E:')
+  });
+  
+  // Calculate meeting length and speaking time
+  const { meetingLength, speakingTime, speakingTimeSeconds } = calculateTimeStats(transcript.text);
+  
+  // Calculate words per minute using the corrected speaking time
+  let wpm = 0;
+  if (speakingTimeSeconds > 0 && totalWords > 0) {
+    wpm = parseFloat(((totalWords / speakingTimeSeconds) * 60).toFixed(1));
+    console.log(`WPM calculation: (${totalWords} words / ${speakingTimeSeconds} seconds) * 60 = ${wpm}`);
+  } else if (totalWords > 0) {
+    // If for some reason we have words but no valid speaking time, estimate based on 1 word per second
+    const estimatedSeconds = Math.max(totalWords, 1);
+    wpm = parseFloat(((totalWords / estimatedSeconds) * 60).toFixed(1));
+    console.log(`Estimated WPM: (${totalWords} words / ${estimatedSeconds} estimated seconds) * 60 = ${wpm}`);
+  }
+  
+  // Verify all values are valid
+  if (isNaN(wpm)) wpm = 0;
+  if (wpm < 0) wpm = 0;
+  
+  const stats = {
+    transcript_id: transcript.id,
+    session_id: transcript.sessionId,
+    meeting_id: transcript.meetingId,
+    unique_words_amount: uniqueWordsCount,
+    total_words: totalWords,
+    words_per_minute: wpm,
+    meeting_length: meetingLength,
+    speaking_time: speakingTime,
+    speaking_time_seconds: speakingTimeSeconds,
+    timestamp: new Date().toISOString(),
+    timestamps_cleaned: transcript.timestampsCleaned || false
+  };
+  
+  console.log("Final calculated stats:", stats);
+  
+  // Store the stats
+  saveTranscriptStats(stats, transcript.id);
+  
+  return stats;
+}
+
+// Calculate meeting length and speaking time from transcript
+function calculateTimeStats(text) {
+  // Extract all timestamp pairs
+  const startTimeRegex = /\[S:(\d+\.\d+)s\]/g;
+  const endTimeRegex = /\[E:(\d+\.\d+)s\]/g;
+  
+  const startTimes = [];
+  const endTimes = [];
+  
+  // Store the original indices to keep track of pairs
+  const timeSegments = [];
+  
+  let match;
+  let startTimeMatches = [];
+  while ((match = startTimeRegex.exec(text)) !== null) {
+    const startTime = parseFloat(match[1]);
+    startTimes.push(startTime);
+    startTimeMatches.push(match[0]);
+    
+    // Store the start position for matching with end times
+    timeSegments.push({
+      start: startTime,
+      end: null,
+      index: timeSegments.length
+    });
+  }
+  
+  let endTimeMatches = [];
+  let endIndex = 0;
+  while ((match = endTimeRegex.exec(text)) !== null) {
+    const endTime = parseFloat(match[1]);
+    endTimes.push(endTime);
+    endTimeMatches.push(match[0]);
+    
+    // Associate with the corresponding start time if possible
+    if (endIndex < timeSegments.length) {
+      timeSegments[endIndex].end = endTime;
+      endIndex++;
+    }
+  }
+  
+  console.log("Start time markers:", startTimeMatches);
+  console.log("End time markers:", endTimeMatches);
+  console.log("Start times (seconds):", startTimes);
+  console.log("End times (seconds):", endTimes);
+  console.log("Initial time segments:", timeSegments);
+  
+  if (startTimes.length === 0 || endTimes.length === 0) {
+    console.warn("No speaking times found in transcript");
+    return {
+      meetingLength: '00h 00m 00s',
+      speakingTime: '00h 00m 00s',
+      speakingTimeSeconds: 0
+    };
+  }
+  
+  // Filter out invalid segments (where end time is null or start > end)
+  const validSegments = timeSegments.filter(segment => 
+    segment.end !== null && segment.start < segment.end
+  );
+  
+  console.log("Valid time segments before merging:", validSegments);
+  
+  // Sort segments by start time
+  validSegments.sort((a, b) => a.start - b.start);
+  
+  // Merge overlapping segments
+  const mergedSegments = [];
+  if (validSegments.length > 0) {
+    let currentSegment = { ...validSegments[0] };
+    
+    for (let i = 1; i < validSegments.length; i++) {
+      const segment = validSegments[i];
+      
+      // If current segment overlaps with the next one
+      if (segment.start <= currentSegment.end) {
+        // Extend the current segment if needed
+        currentSegment.end = Math.max(currentSegment.end, segment.end);
+      } else {
+        // No overlap, add the current segment and start a new one
+        mergedSegments.push(currentSegment);
+        currentSegment = { ...segment };
+      }
+    }
+    
+    // Add the last segment
+    mergedSegments.push(currentSegment);
+  }
+  
+  console.log("Merged time segments:", mergedSegments);
+  
+  // Calculate total speaking time from merged segments
+  let totalSpeakingTimeSeconds = 0;
+  
+  for (const segment of mergedSegments) {
+    const duration = segment.end - segment.start;
+    totalSpeakingTimeSeconds += duration;
+    console.log(`Merged interval: ${segment.start}s to ${segment.end}s = ${duration}s`);
+  }
+  
+  // Calculate meeting length (take the last end time as meeting length)
+  const meetingLengthSeconds = Math.max(...endTimes);
+  
+  console.log("Total speaking time (after merging overlaps):", totalSpeakingTimeSeconds, "seconds");
+  console.log("Meeting length:", meetingLengthSeconds, "seconds");
+  
+  return {
+    meetingLength: formatTimeDisplay(meetingLengthSeconds),
+    speakingTime: formatTimeDisplay(totalSpeakingTimeSeconds),
+    speakingTimeSeconds: totalSpeakingTimeSeconds
+  };
+}
+
+// Format seconds into 00h 00m 00s format
+function formatTimeDisplay(totalSeconds) {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+  
+  return `${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`;
+}
+
+// Calculate word stats (unique words and total words) in a transcript
+function calculateWordStats(text) {
+  // First, make sure all timestamp markers are completely removed
+  // This regex will match markers like [S:123.4s] and [E:123.4s] or any similar format
+  const timestampRegex = /\[\s*[SE]:\s*\d+(?:\.\d+)?s\s*\]/g;
+  const cleanedText = text.replace(timestampRegex, ' ');
+  
+  // Second cleaning pass to ensure no brackets remain and normalize spaces
+  const cleanText = cleanedText.replace(/\[[^\]]*\]/g, ' ').replace(/\s+/g, ' ').trim();
+  
+  // Log the clean text for debugging
+  console.log("Clean text for word count:", cleanText);
+  
+  // Split by single spaces to properly count words
+  const allWords = cleanText.split(' ').filter(word => word.length > 0);
+  
+  console.log("All words array:", allWords);
+  console.log("Total word count:", allWords.length);
+  
+  // Clean up words for unique counting - preserve contractions like "don't"
+  const cleanedWords = allWords.map(word => {
+    // Convert to lowercase first
+    let cleaned = word.toLowerCase();
+    
+    // Special handling for contractions - preserve the apostrophe in words like "don't"
+    if (cleaned.includes("'")) {
+      return cleaned;
+    }
+    
+    // Remove punctuation for other words
+    return cleaned.replace(/[.,!?;:()"'-]/g, '');
+  }).filter(word => word.length > 0);
+  
+  // Count unique words
+  const uniqueWords = new Set(cleanedWords);
+  
+  console.log("Unique words set:", [...uniqueWords].sort());
+  console.log("Unique word count:", uniqueWords.size);
+  
+  // Verify with the test transcript
+  if (text.includes("hi hi do you hear me") && text.includes("okay bye")) {
+    console.log("Detected test transcript - expected counts: 41 total, 20 unique");
+    
+    // Expected words in the test transcript
+    const expectedWords = [
+      "hi", "hi", "do", "you", "hear", "me", "yes", "I", "do", "okay", 
+      "what", "will", "going", "to", "do", "yes", "yes", "no", "no", "I", 
+      "don't", "want", "to", "see", "today", "blah", "blah", "blah", "blah", 
+      "okay", "okay", "oh", "no", "I", "don't", "want", "to", "see", "today", 
+      "okay", "bye"
+    ];
+    console.log("Expected word count:", expectedWords.length);
+    
+    // Expected unique words
+    const expectedUniqueWords = [
+      "hi", "do", "you", "hear", "me", "yes", "i", "okay", "what", "will", 
+      "going", "to", "no", "don't", "want", "see", "today", "blah", "oh", "bye"
+    ];
+    console.log("Expected unique word count:", expectedUniqueWords.length);
+    
+    // Verify our word count matches the expected count
+    if (allWords.length !== expectedWords.length) {
+      console.warn(`Word count discrepancy: got ${allWords.length}, expected ${expectedWords.length}`);
+      console.log("Difference:", Math.abs(allWords.length - expectedWords.length));
+      
+      // Find differences
+      const ourWordsStr = allWords.join(' ');
+      const expectedWordsStr = expectedWords.join(' ');
+      console.log("Our words:", ourWordsStr);
+      console.log("Expected words:", expectedWordsStr);
+    } else {
+      console.log("Word count matches expected value!");
+    }
+    
+    // Verify unique word count
+    if (uniqueWords.size !== expectedUniqueWords.length) {
+      console.warn(`Unique word count discrepancy: got ${uniqueWords.size}, expected ${expectedUniqueWords.length}`);
+      
+      // Find differences in unique words
+      const ourUniqueWords = [...uniqueWords].sort();
+      const expectedUniqueSorted = [...expectedUniqueWords].sort();
+      
+      console.log("Our unique words:", ourUniqueWords);
+      console.log("Expected unique words:", expectedUniqueSorted);
+      
+      // Find words in our set that are not in expected
+      const extraWords = ourUniqueWords.filter(word => !expectedUniqueSorted.includes(word));
+      if (extraWords.length > 0) {
+        console.log("Extra words in our set:", extraWords);
+      }
+      
+      // Find words in expected that are not in our set
+      const missingWords = expectedUniqueSorted.filter(word => !ourUniqueWords.includes(word));
+      if (missingWords.length > 0) {
+        console.log("Missing words from our set:", missingWords);
+      }
+    } else {
+      console.log("Unique word count matches expected value!");
+    }
+  }
+  
+  return {
+    uniqueWordsCount: uniqueWords.size,
+    totalWords: allWords.length
+  };
+}
+
+// Calculate words per minute from a transcript with timestamps
+function calculateWordsPerMinute(text, totalWords = null) {
+  // Extract all timestamp pairs
+  const startTimeRegex = /\[S:(\d+\.\d+)s\]/g;
+  const endTimeRegex = /\[E:(\d+\.\d+)s\]/g;
+  
+  const startTimes = [];
+  const endTimes = [];
+  
+  // Create a copy of the text for debugging
+  const debugText = text;
+  
+  let match;
+  while ((match = startTimeRegex.exec(text)) !== null) {
+    startTimes.push(parseFloat(match[1]));
+  }
+  
+  while ((match = endTimeRegex.exec(text)) !== null) {
+    endTimes.push(parseFloat(match[1]));
+  }
+  
+  // Count words if not provided
+  if (totalWords === null) {
+    // Count words (excluding timestamp markers)
+    const cleanText = text.replace(/\[S:\d+\.\d+s\]|\[E:\d+\.\d+s\]/g, '');
+    totalWords = cleanText.split(/\s+/).filter(word => word.length > 0).length;
+  }
+  
+  // Log for debugging
+  console.log("Start times:", startTimes);
+  console.log("End times:", endTimes);
+  console.log("Total words:", totalWords);
+  
+  // Check for valid pairs
+  if (startTimes.length !== endTimes.length) {
+    console.warn('Timestamp mismatch - different number of start and end markers:', 
+                startTimes.length, endTimes.length);
+    // If we have words, use default WPM to avoid showing 0
+    if (totalWords > 0) {
+      return 60.0;
+    }
+    return 0;
+  }
+  
+  if (startTimes.length === 0) {
+    console.warn('No timestamps found in transcript');
+    // If we have words, use default WPM to avoid showing 0
+    if (totalWords > 0) {
+      return 60.0;
+    }
+    return 0;
+  }
+  
+  // Calculate total speaking time in seconds
+  let totalSpeakingTimeSeconds = 0;
+  let validIntervals = 0;
+  
+  for (let i = 0; i < startTimes.length; i++) {
+    // Ensure valid time range
+    if (endTimes[i] > startTimes[i]) {
+      const interval = endTimes[i] - startTimes[i];
+      totalSpeakingTimeSeconds += interval;
+      validIntervals++;
+      console.log(`Interval ${i+1}: ${startTimes[i]}s to ${endTimes[i]}s = ${interval}s`);
+    } else {
+      console.warn(`Invalid time interval at position ${i}: start ${startTimes[i]}s, end ${endTimes[i]}s`);
+    }
+  }
+  
+  console.log("Total speaking time calculated:", totalSpeakingTimeSeconds, "seconds");
+  console.log("Valid intervals:", validIntervals);
+  
+  // Calculate words per minute
+  if (totalSpeakingTimeSeconds > 0) {
+    const wpm = (totalWords / totalSpeakingTimeSeconds) * 60;
+    console.log(`WPM calculation: (${totalWords} words / ${totalSpeakingTimeSeconds} seconds) * 60 = ${wpm}`);
+    return parseFloat(wpm.toFixed(2)); // Round to 2 decimal places
+  } else if (totalWords > 0) {
+    // This case means we have words but the speaking time calculation resulted in 0
+    console.log("Using default WPM (60) because speaking time is 0 but words exist:", totalWords);
+    
+    // Look at the transcript and try to estimate based on full transcript duration
+    if (endTimes.length > 0) {
+      const lastTimestamp = Math.max(...endTimes);
+      const firstTimestamp = Math.min(...startTimes);
+      const totalDuration = lastTimestamp - firstTimestamp;
+      
+      if (totalDuration > 0) {
+        const estimatedWpm = (totalWords / totalDuration) * 60;
+        console.log(`Estimated WPM based on total duration: (${totalWords} words / ${totalDuration} seconds) * 60 = ${estimatedWpm}`);
+        return parseFloat(estimatedWpm.toFixed(2));
+      }
+    }
+    
+    // Fallback to default
+    return 60.0;
+  } else {
+    return 0;
+  }
+}
+
+// Save transcript stats to storage
+function saveTranscriptStats(stats, transcriptId) {
+  // Get existing stats
+  chrome.storage.local.get(['transcript_stats'], (result) => {
+    const allStats = result.transcript_stats || {};
+    
+    // Add new stats with transcript ID as key
+    allStats[transcriptId] = stats;
+    
+    // Save back to storage
+    chrome.storage.local.set({ transcript_stats: allStats }, () => {
+      console.log('Transcript stats saved:', stats);
+    });
+  });
+}
+
+// Get stats for a specific transcript
+function getTranscriptStats(transcriptId, callback) {
+  chrome.storage.local.get(['transcript_stats'], (result) => {
+    const allStats = result.transcript_stats || {};
+    const stats = allStats[transcriptId] || null;
+    callback(stats);
+  });
+}
+
+// Get all saved transcript stats
+function getAllTranscriptStats(callback) {
+  chrome.storage.local.get(['transcript_stats'], (result) => {
+    const allStats = result.transcript_stats || {};
+    callback(allStats);
+  });
+}
+
+// Export functions
+window.TranscriptStats = {
+  calculateTranscriptStats,
+  getTranscriptStats,
+  getAllTranscriptStats,
+  fixTranscriptTimestamps
+}; 
