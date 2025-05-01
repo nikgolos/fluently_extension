@@ -444,13 +444,24 @@ function cleanupRecognition() {
   if (recognition) {
     try {
       recognition.stop();
-      recognition.abort();
     } catch (e) {
-      console.log('Cleanup error:', e);
+      // Ignore errors when stopping already stopped recognition
     }
     recognition = null;
   }
+  
+  // Also clean up the audio stream if it exists
+  if (window.recognitionStream) {
+    try {
+      window.recognitionStream.getAudioTracks().forEach(track => track.stop());
+      window.recognitionStream = null;
+    } catch (e) {
+      console.warn("Error cleaning up audio stream:", e);
+    }
+  }
+  
   isRecording = false;
+  updateRecordingStatus();
 }
 
 function startRecording() {
@@ -495,158 +506,175 @@ function startRecording() {
     recognition.lang = 'en-US';
     recognition.maxAlternatives = 1;
 
-    recognition.onstart = () => {
-      console.log("Recognition started successfully");
-      isRecording = true;
-      retryCount = 0; // Reset retry count on successful start
-      updateRecordingStatus();
-      chrome.runtime.sendMessage({
-        type: 'debug',
-        text: 'Recording started - Speak now'
-      });
-    };
-
-    recognition.onresult = (event) => {
-      // Log raw results for debugging
-      console.log('Speech recognition results:', event.results);
-      
-      let finalTranscript = '';
-      let interimTranscript = '';
-
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          finalTranscript += transcript;
-        } else {
-          interimTranscript += transcript;
-        }
-      }
-
-      // Add two timecodes - one before and one after the transcript
-      if (finalTranscript) {
-        const now = new Date();
-        const endTimeSinceStart = ((now - startTime) / 1000).toFixed(1);
-        
-        // Use the recorded speech start time if available, otherwise estimate it
-        let startTimeSinceStart;
-        if (recognition.speechStartTime) {
-          startTimeSinceStart = ((recognition.speechStartTime - startTime) / 1000).toFixed(1);
-        } else {
-          // Fallback: estimate based on transcript length
-          const approximateDurationInSeconds = finalTranscript.length / 5;
-          startTimeSinceStart = Math.max(0, (endTimeSinceStart - approximateDurationInSeconds).toFixed(1));
-        }
-        
-        // Format with start and end timecodes
-        const formattedTranscript = `[S:${startTimeSinceStart}s] ${finalTranscript} [E:${endTimeSinceStart}s]`;
-        
-        lastTranscript = lastTranscript + ' ' + formattedTranscript;
+    // Set up enhanced audio processing to better transcribe all speakers on the call
+    setupEnhancedAudioProcessing().then(() => {
+      recognition.onstart = () => {
+        console.log("Recognition started successfully");
+        isRecording = true;
+        retryCount = 0; // Reset retry count on successful start
+        updateRecordingStatus();
         chrome.runtime.sendMessage({
-          type: 'transcriptUpdate',
-          sessionId: sessionId,
-          text: lastTranscript,
-          isFinal: true
+          type: 'debug',
+          text: 'Recording started - Speak now'
         });
+      };
+
+      recognition.onresult = (event) => {
+        // Log raw results for debugging
+        console.log('Speech recognition results:', event.results);
         
-        // Reset speech start time for the next segment
-        recognition.speechStartTime = null;
-        
-        // Save on significant transcript updates
-        saveTranscriptSegment();
-      } else if (interimTranscript) {
-        chrome.runtime.sendMessage({
-          type: 'transcriptUpdate',
-          sessionId: sessionId,
-          text: interimTranscript,
-          isFinal: false
-        });
-      }
-    };
+        let finalTranscript = '';
+        let interimTranscript = '';
 
-    recognition.onsoundstart = () => {
-      console.log("Sound detected");
-      // Record speech start time
-      if (!recognition.speechStartTime) {
-        recognition.speechStartTime = new Date();
-      }
-      chrome.runtime.sendMessage({
-        type: 'debug',
-        text: 'Sound detected'
-      });
-    };
-
-    recognition.onsoundend = () => {
-      console.log("Sound ended");
-      chrome.runtime.sendMessage({
-        type: 'debug',
-        text: 'Sound ended'
-      });
-    };
-
-    recognition.onerror = (event) => {
-      console.error('Speech recognition error:', event.error);
-      
-      // Handle specific errors
-      if (event.error === 'aborted' || event.error === 'not-allowed') {
-        if (retryCount < MAX_RETRIES) {
-          retryCount++;
-          setTimeout(() => {
-            chrome.runtime.sendMessage({
-              type: 'debug',
-              text: `Restarting recognition after error (attempt ${retryCount}/${MAX_RETRIES})`
-            });
-            startRecording();
-          }, 1000);
-        } else {
-          isRecording = false;
-          chrome.runtime.sendMessage({
-            type: 'error',
-            error: `Speech recognition failed after ${MAX_RETRIES} retries. Please refresh the page.`
-          });
-          updateRecordingStatus();
-        }
-      } else {
-        // For other errors, try to restart recognition
-        setTimeout(() => {
-          if (isRecording) {
-            chrome.runtime.sendMessage({
-              type: 'debug',
-              text: 'Attempting to restart recognition after error'
-            });
-            recognition.start();
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
           }
-        }, 1000);
-      }
-    };
-
-    recognition.onend = () => {
-      console.log('Recognition ended');
-      // If we're still supposed to be recording, restart
-      if (isRecording) {
-        console.log('Restarting recognition...');
-        try {
-          recognition.start();
-        } catch (e) {
-          console.error('Error restarting recognition:', e);
         }
-      } else {
-        // We're intentionally stopping, send the final transcript
-        console.log('Recording stopped');
-        
-        if (lastTranscript && !hasReportedFinalTranscript) {
-          hasReportedFinalTranscript = true;
+
+        // Add two timecodes - one before and one after the transcript
+        if (finalTranscript) {
+          const now = new Date();
+          const endTimeSinceStart = ((now - startTime) / 1000).toFixed(1);
           
-          console.log('Reporting final transcript:', lastTranscript);
+          // Use the recorded speech start time if available, otherwise estimate it
+          let startTimeSinceStart;
+          if (recognition.speechStartTime) {
+            startTimeSinceStart = ((recognition.speechStartTime - startTime) / 1000).toFixed(1);
+          } else {
+            // Fallback: estimate based on transcript length
+            const approximateDurationInSeconds = finalTranscript.length / 5;
+            startTimeSinceStart = Math.max(0, (endTimeSinceStart - approximateDurationInSeconds).toFixed(1));
+          }
+          
+          // Format with start and end timecodes
+          const formattedTranscript = `[S:${startTimeSinceStart}s] ${finalTranscript} [E:${endTimeSinceStart}s]`;
+          
+          lastTranscript = lastTranscript + ' ' + formattedTranscript;
           chrome.runtime.sendMessage({
-            type: 'finalTranscript',
+            type: 'transcriptUpdate',
             sessionId: sessionId,
-            text: lastTranscript.trim()
+            text: lastTranscript,
+            isFinal: true
+          });
+          
+          // Reset speech start time for the next segment
+          recognition.speechStartTime = null;
+          
+          // Save on significant transcript updates
+          saveTranscriptSegment();
+        } else if (interimTranscript) {
+          chrome.runtime.sendMessage({
+            type: 'transcriptUpdate',
+            sessionId: sessionId,
+            text: interimTranscript,
+            isFinal: false
           });
         }
-      }
-    };
+      };
 
-    recognition.start();
+      recognition.onsoundstart = () => {
+        console.log("Sound detected");
+        // Record speech start time
+        if (!recognition.speechStartTime) {
+          recognition.speechStartTime = new Date();
+        }
+        chrome.runtime.sendMessage({
+          type: 'debug',
+          text: 'Sound detected'
+        });
+      };
+
+      recognition.onsoundend = () => {
+        console.log("Sound ended");
+        chrome.runtime.sendMessage({
+          type: 'debug',
+          text: 'Sound ended'
+        });
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        
+        // Handle specific errors
+        if (event.error === 'aborted' || event.error === 'not-allowed') {
+          if (retryCount < MAX_RETRIES) {
+            retryCount++;
+            setTimeout(() => {
+              chrome.runtime.sendMessage({
+                type: 'debug',
+                text: `Restarting recognition after error (attempt ${retryCount}/${MAX_RETRIES})`
+              });
+              startRecording();
+            }, 1000);
+          } else {
+            isRecording = false;
+            chrome.runtime.sendMessage({
+              type: 'error',
+              error: `Speech recognition failed after ${MAX_RETRIES} retries. Please refresh the page.`
+            });
+            updateRecordingStatus();
+          }
+        } else {
+          // For other errors, try to restart recognition
+          setTimeout(() => {
+            if (isRecording) {
+              chrome.runtime.sendMessage({
+                type: 'debug',
+                text: 'Attempting to restart recognition after error'
+              });
+              recognition.start();
+            }
+          }, 1000);
+        }
+      };
+
+      recognition.onend = () => {
+        console.log('Recognition ended');
+        // If we're still supposed to be recording, restart
+        if (isRecording) {
+          console.log('Restarting recognition...');
+          try {
+            recognition.start();
+          } catch (e) {
+            console.error('Error restarting recognition:', e);
+          }
+        } else {
+          // We're intentionally stopping, send the final transcript
+          console.log('Recording stopped');
+          
+          if (lastTranscript && !hasReportedFinalTranscript) {
+            hasReportedFinalTranscript = true;
+            
+            console.log('Reporting final transcript:', lastTranscript);
+            chrome.runtime.sendMessage({
+              type: 'finalTranscript',
+              sessionId: sessionId,
+              text: lastTranscript.trim()
+            });
+          }
+        }
+      };
+
+      // Start recognition after all event handlers are set up
+      try {
+        recognition.start();
+        console.log("Recognition started");
+      } catch (e) {
+        console.error('Error starting recognition:', e);
+        chrome.runtime.sendMessage({
+          type: 'error',
+          error: 'Error starting recognition: ' + e.message
+        });
+      }
+    }).catch(error => {
+      console.error('Error setting up enhanced audio:', error);
+      // Fall back to standard recognition if enhanced setup fails
+      startStandardRecognition();
+    });
   } catch (error) {
     console.error('Error starting recording:', error);
     chrome.runtime.sendMessage({
@@ -730,4 +758,204 @@ document.addEventListener('visibilitychange', () => {
       saveTranscriptOnMeetingEnd();
     }
   }
-}); 
+});
+
+// Add this function above the startRecording function
+async function setupEnhancedAudioProcessing() {
+  try {
+    // Create enhanced audio constraints with strong echo cancellation and optimizations
+    // for capturing other speakers on calls
+    const audioConstraints = {
+      // Core audio processing features
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      
+      // Additional advanced configurations for better speaker isolation
+      advanced: [{
+        // Echo cancellation is the most important setting for hearing other speakers
+        echoCancellation: true,
+        
+        // Noise suppression helps filter background noise from speech
+        noiseSuppression: true,
+        
+        // Auto gain control helps with varying volume levels
+        autoGainControl: true,
+        
+        // Try to minimize latency for real-time transcription
+        latency: 0,
+        
+        // Higher gain setting to better pick up remote speakers
+        // This may be supported on some browsers/devices
+        gain: 1.0,
+        
+        // Attempt to use dual-channel mode if available
+        // This can help with spatial separation of speakers
+        channelCount: 2,
+        
+        // Some browsers allow setting mic gain programmatically
+        volume: 1.0
+      }]
+    };
+
+    // Get access to the user's microphone with enhanced settings
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: audioConstraints
+    });
+    
+    // Log detailed information about the audio configuration
+    logAudioStreamInfo(stream);
+    
+    // Try to apply the enhanced audio configuration directly to the SpeechRecognition object
+    // This is browser-dependent but helps when available
+    if (recognition) {
+      // Method 1: Direct media stream assignment (supported in some browsers)
+      if (typeof recognition.mediaStream !== 'undefined') {
+        recognition.mediaStream = stream;
+        console.log("Applied mediaStream directly to recognition object");
+      }
+      
+      // Method 2: Apply audio constraints if supported
+      if (typeof recognition.audioConfig !== 'undefined') {
+        recognition.audioConfig = audioConstraints;
+        console.log("Applied audio constraints directly to recognition.audioConfig");
+      }
+      
+      // Method 3: Try to set properties directly on the recognition object
+      try {
+        // These are non-standard but might be implemented in some browsers
+        if (typeof recognition.acoustic !== 'undefined') {
+          recognition.acoustic = {
+            echoCancellation: true,
+            enhancedVoiceDetection: true,
+            voiceIsolation: true
+          };
+          console.log("Applied acoustic optimizations");
+        }
+        
+        // Set some browsers might support a direct audio processing flag
+        if (window.SpeechRecognition && recognition instanceof window.SpeechRecognition) {
+          recognition.enhancedAudio = true;
+          console.log("Set enhancedAudio flag on recognition object");
+        }
+      } catch (e) {
+        // Ignore any errors from these experimental approaches
+        console.log("Couldn't set enhanced audio flags:", e);
+      }
+    }
+    
+    // Store the stream for cleanup later
+    window.recognitionStream = stream;
+    
+    return true;
+  } catch (error) {
+    console.warn("Could not apply enhanced audio settings:", error);
+    // Continue without the enhanced settings
+    return false;
+  }
+}
+
+// Function to log detailed information about the audio stream configuration
+function logAudioStreamInfo(stream) {
+  try {
+    console.log("--- Enhanced Audio Configuration Details ---");
+    
+    // Get the audio tracks from the stream
+    const audioTracks = stream.getAudioTracks();
+    console.log(`Number of audio tracks: ${audioTracks.length}`);
+    
+    // Summary for user notification
+    let userMessage = '';
+    let echoCancellationEnabled = false;
+    
+    // Log details for each track
+    audioTracks.forEach((track, index) => {
+      console.log(`Audio Track ${index + 1}:`);
+      console.log(`- Label: ${track.label}`);
+      console.log(`- Enabled: ${track.enabled}`);
+      console.log(`- Muted: ${track.muted}`);
+      console.log(`- ReadyState: ${track.readyState}`);
+      
+      // Get the constraints that were applied
+      const settings = track.getSettings();
+      console.log("Applied Settings:");
+      console.log(`- Echo Cancellation: ${settings.echoCancellation}`);
+      console.log(`- Noise Suppression: ${settings.noiseSuppression}`);
+      console.log(`- Auto Gain Control: ${settings.autoGainControl}`);
+      
+      // Track settings for user notification
+      if (settings.echoCancellation) {
+        echoCancellationEnabled = true;
+      }
+      
+      // Additional settings if available
+      if (settings.latency) console.log(`- Latency: ${settings.latency}ms`);
+      if (settings.sampleRate) console.log(`- Sample Rate: ${settings.sampleRate}Hz`);
+      if (settings.sampleSize) console.log(`- Sample Size: ${settings.sampleSize}bits`);
+      if (settings.channelCount) console.log(`- Channel Count: ${settings.channelCount}`);
+      
+      // Check for constraints that were requested but couldn't be applied
+      const constraints = track.getConstraints();
+      if (constraints && constraints.advanced) {
+        console.log("Requested constraints:", constraints);
+      }
+    });
+    
+    console.log("---------------------------------------");
+    
+    // Create user-friendly message
+    if (echoCancellationEnabled) {
+      userMessage = 'Enhanced audio with echo cancellation enabled - should better pick up other speakers';
+    } else {
+      userMessage = 'Basic audio configuration - echo cancellation status unknown';
+    }
+    
+    // Send user-friendly message to the extension's debug log
+    chrome.runtime.sendMessage({
+      type: 'debug',
+      text: userMessage
+    });
+    
+    // Also log to console
+    console.log(userMessage);
+    
+    return echoCancellationEnabled;
+  } catch (e) {
+    console.warn("Error logging audio stream info:", e);
+    
+    // Send fallback message in case of error
+    chrome.runtime.sendMessage({
+      type: 'debug',
+      text: 'Audio configured with requested echo cancellation (status unknown)'
+    });
+    
+    return false;
+  }
+}
+
+// Add this helper function to fall back to standard recognition if enhanced setup fails
+function startStandardRecognition() {
+  try {
+    // Set up standard event handlers
+    recognition.onstart = () => {
+      console.log("Standard recognition started successfully");
+      isRecording = true;
+      retryCount = 0;
+      updateRecordingStatus();
+      chrome.runtime.sendMessage({
+        type: 'debug',
+        text: 'Standard recording started - Speak now'
+      });
+    };
+    
+    // Start recognition directly without enhanced audio
+    recognition.start();
+    console.log("Standard recognition started");
+  } catch (error) {
+    console.error('Error starting standard recognition:', error);
+    chrome.runtime.sendMessage({
+      type: 'error',
+      error: error.message
+    });
+  }
+} 

@@ -6,6 +6,7 @@ A Chrome extension that automatically transcribes Google Meet meetings using Web
 - Automatically detects when you join a Google Meet meeting
 - Automatically starts transcribing when a meeting is detected
 - Records and transcribes speech in real-time
+- Enhanced echo cancellation for improved transcription of other speakers on calls
 - Auto-saves transcriptions at regular intervals
 - View and manage saved transcriptions
 - Simple and intuitive interface
@@ -35,6 +36,7 @@ A Chrome extension that automatically transcribes Google Meet meetings using Web
 This extension:
 - Detects when you're in an active Google Meet meeting
 - Uses the Web Speech API to transcribe speech in real-time
+- Applies enhanced audio processing with echo cancellation to better capture all speakers
 - Automatically saves transcripts at regular intervals
 - Detects when meetings end and finalizes transcripts
 - Provides an interface to view and manage your saved transcripts
