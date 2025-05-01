@@ -137,33 +137,31 @@ function calculateTranscriptStats(transcript) {
   }
 
   console.log("Calculating stats for transcript:", transcript.id);
+  console.log("Transcript text sample:", transcript.text.slice(0, 100) + "...");
   
-  // First, fix any overlapping timestamps in the transcript
+  // First, fix any overlapping timestamps for calculation purposes only
   const originalText = transcript.text;
   const fixedText = fixTranscriptTimestamps(originalText);
   
-  // Update the transcript text if it was fixed
+  // Log if timestamps were fixed
   if (fixedText !== originalText) {
-    console.log("Transcript timestamps were fixed.");
-    transcript.text = fixedText;
-    transcript.timestampsCleaned = true;
+    console.log("Transcript timestamps were fixed for calculation purposes.");
+    console.log("Original length:", originalText.length, "Fixed length:", fixedText.length);
   }
-  
-  console.log("Transcript text sample:", transcript.text.slice(0, 100) + "...");
 
-  // Calculate unique words and total words
-  const { uniqueWordsCount, totalWords } = calculateWordStats(transcript.text);
+  // Calculate unique words and total words using the fixed text
+  const { uniqueWordsCount, totalWords } = calculateWordStats(fixedText);
   
   // Validate the word counts
   console.log("Validating word counts:", { 
     totalWords, 
     uniqueWordsCount, 
-    textLength: transcript.text.length,
-    hasTimestamps: transcript.text.includes('[S:') && transcript.text.includes('[E:')
+    textLength: fixedText.length,
+    hasTimestamps: fixedText.includes('[S:') && fixedText.includes('[E:')
   });
   
-  // Calculate meeting length and speaking time
-  const { meetingLength, speakingTime, speakingTimeSeconds } = calculateTimeStats(transcript.text);
+  // Calculate meeting length and speaking time using the fixed text
+  const { meetingLength, speakingTime, speakingTimeSeconds } = calculateTimeStats(fixedText);
   
   // Calculate words per minute using the corrected speaking time
   let wpm = 0;
@@ -192,7 +190,7 @@ function calculateTranscriptStats(transcript) {
     speaking_time: speakingTime,
     speaking_time_seconds: speakingTimeSeconds,
     timestamp: new Date().toISOString(),
-    timestamps_cleaned: transcript.timestampsCleaned || false
+    timestamps_fixed_for_calculation: fixedText !== originalText
   };
   
   console.log("Final calculated stats:", stats);
