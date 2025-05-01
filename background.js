@@ -166,6 +166,97 @@ function getMeetingIdFromUrl(sender) {
   return 'meet-' + new Date().toISOString().replace(/[:.-]/g, '');
 }
 
+// Function to fix timestamp overlaps by removing problematic pairs from transcript
+function fixOverlappingTimestamps(text) {
+  if (!text) return text;
+  
+  console.log("Fixing overlapping timestamps before saving transcript...");
+  
+  // First extract all timestamps with their positions
+  const regex = /\[(E|S):(\d+\.\d+)s\]/g;
+  const timestamps = [];
+  let match;
+  
+  // Find all timestamps in order
+  while ((match = regex.exec(text)) !== null) {
+    timestamps.push({
+      type: match[1], // "S" or "E"
+      time: parseFloat(match[2]),
+      position: match.index,
+      length: match[0].length,
+      fullMatch: match[0]
+    });
+  }
+  
+  console.log(`Found ${timestamps.length} timestamps`);
+  
+  // Look for E followed by S where S time < E time
+  const overlaps = [];
+  
+  for (let i = 0; i < timestamps.length - 1; i++) {
+    const current = timestamps[i];
+    const next = timestamps[i+1];
+    
+    if (current.type === 'E' && next.type === 'S' && next.time < current.time) {
+      console.log(`Found overlap: ${current.fullMatch} followed by ${next.fullMatch}`);
+      overlaps.push({
+        end: current,
+        start: next
+      });
+    }
+  }
+  
+  console.log(`Found ${overlaps.length} overlapping pairs to remove`);
+  
+  if (overlaps.length === 0) {
+    return text;
+  }
+  
+  // Sort overlaps by position in reverse order to not affect earlier positions when removing
+  overlaps.sort((a, b) => b.end.position - a.end.position);
+  
+  // Create a new transcript with the problematic timestamps removed
+  let cleanedText = text;
+  
+  // Remove each pair of overlapping timestamps
+  for (const overlap of overlaps) {
+    const endPos = overlap.end.position;
+    const startPos = overlap.start.position;
+    
+    // Remove BOTH the end timestamp AND the start timestamp 
+    // while preserving text between them
+    cleanedText = cleanedText.substring(0, endPos) + 
+                cleanedText.substring(endPos + overlap.end.length, startPos) +
+                cleanedText.substring(startPos + overlap.start.length);
+    
+    console.log(`Removed overlapping timestamps: ${overlap.end.fullMatch} and ${overlap.start.fullMatch}`);
+  }
+  
+  // Double-check for any remaining problematic patterns just to be sure
+  // This is a safety check to catch cases where the first pass might have missed
+  const checkRegex = /\[E:\d+\.\d+s\]\s*\[S:\d+\.\d+s\]/g;
+  if (checkRegex.test(cleanedText)) {
+    console.warn("Still found potential overlapping timestamps after cleaning, running second pass");
+    
+    // Just remove the pattern directly as a fallback
+    cleanedText = cleanedText.replace(/\[E:\d+\.\d+s\]\s*\[S:\d+\.\d+s\]/g, ' ');
+  }
+  
+  console.log("Original length:", text.length, "Cleaned length:", cleanedText.length);
+  
+  // Do a final check to make sure we didn't accidentally create incorrect timestamp pairs
+  let startCount = (cleanedText.match(/\[S:\d+\.\d+s\]/g) || []).length;
+  let endCount = (cleanedText.match(/\[E:\d+\.\d+s\]/g) || []).length;
+  
+  console.log(`Final timestamp counts - Start: ${startCount}, End: ${endCount}`);
+  
+  if (startCount !== endCount) {
+    console.warn(`Mismatched timestamp counts after cleaning: ${startCount} starts, ${endCount} ends`);
+  }
+  
+  return cleanedText;
+}
+
 function saveTranscriptToStorage(text, sender, sessionId, meetingCode) {
   if (!text || text.trim() === '') {
     sendDebugMessage('No transcript to save');
@@ -173,6 +264,16 @@ function saveTranscriptToStorage(text, sender, sessionId, meetingCode) {
   }
   
   try {
+    // Clean up any overlapping timestamps before saving
+    const cleanedText = fixOverlappingTimestamps(text);
+    const wasFixed = cleanedText !== text;
+    
+    if (wasFixed) {
+      console.log("Removed overlapping timestamps from transcript");
+      sendDebugMessage('Fixed overlapping timestamps in transcript');
+      text = cleanedText; // Use the cleaned version going forward
+    }
+    
     const timestamp = new Date().toISOString();
     const formattedDate = new Date().toLocaleString();
     const meetId = meetingCode || getMeetingIdFromUrl(sender);
@@ -184,7 +285,8 @@ function saveTranscriptToStorage(text, sender, sessionId, meetingCode) {
       timestamp: timestamp,
       formattedDate: formattedDate,
       meetingId: meetId,
-      text: text
+      text: text,
+      timestampsFixed: wasFixed
     };
     
     // Log what we're saving
