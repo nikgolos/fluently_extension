@@ -4,6 +4,8 @@ let currentTranscript = '';
 let isRecordingStopped = false;
 let pendingInjections = {};
 let currentSessionId = null;
+let sessionIdProcessed = null;
+let transcriptPageOpened = false;
 
 function sendDebugMessage(message) {
   console.log("DEBUG:", message);
@@ -51,7 +53,7 @@ function injectContentScriptIfNeeded(tabId, url) {
   });
 }
 
-// Listen for messages from the content script
+// Listen for messages from content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log("Message received in background:", message);
   
@@ -70,6 +72,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
   } else if (message.type === 'meetingEnded') {
     // This is a dedicated message for when a meeting ends, save immediately
+    // Check if we've already processed this session to avoid duplicates
+    if (sessionIdProcessed === message.sessionId) {
+      console.log("Duplicate meetingEnded message received for session", message.sessionId, "- ignoring");
+      return;
+    }
+    
     console.log("Meeting ended message received, saving transcript immediately");
     currentTranscript = message.text;
     saveTranscriptToStorage(currentTranscript, sender, message.sessionId);
@@ -82,7 +90,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendDebugMessage('Recording stopped, preparing to save transcript');
     }
   } else if (message.type === 'debug' && message.text.includes('Meeting ended') && currentTranscript) {
-    // Auto-save transcript when meeting ends
+    // Auto-save transcript when meeting ends, but check for duplicates
+    if (sessionIdProcessed === currentSessionId) {
+      console.log("Ignoring duplicate meeting ended debug message for session", currentSessionId);
+      return;
+    }
+    
     sendDebugMessage('Meeting ended detected via debug message, saving transcript');
     saveTranscriptToStorage(currentTranscript, sender, currentSessionId);
   } else if (message.type === 'openTranscriptsPage') {
@@ -263,6 +276,16 @@ function saveTranscriptToStorage(text, sender, sessionId, meetingCode) {
     return;
   }
   
+  // Prevent duplicate saving of the same transcript
+  if (sessionId && sessionIdProcessed === sessionId) {
+    console.log('This transcript has already been processed, skipping duplicate save');
+    sendDebugMessage('Skipping duplicate transcript save');
+    return;
+  }
+  
+  // Mark this session as processed
+  sessionIdProcessed = sessionId;
+  
   try {
     // Clean up any overlapping timestamps before saving
     const cleanedText = fixOverlappingTimestamps(text);
@@ -313,35 +336,33 @@ function saveTranscriptToStorage(text, sender, sessionId, meetingCode) {
       chrome.storage.local.set({ transcripts: transcripts }, () => {
         sendDebugMessage('Transcript saved to storage');
         
-        // Calculate transcript stats
-        if (typeof TranscriptStats !== 'undefined') {
-          TranscriptStats.calculateTranscriptStats(transcriptEntry);
-        } else {
-          // Need to load the stats module first
-          chrome.tabs.create({ 
-            url: 'about:blank',
-            active: false
-          }, (tab) => {
-            // Load transcript_stats.js in the tab
-            chrome.scripting.executeScript({
-              target: { tabId: tab.id },
-              files: ['transcript_stats.js']
-            }).then(() => {
-              // Calculate stats
-              chrome.scripting.executeScript({
-                target: { tabId: tab.id },
-                func: calculateStats,
-                args: [transcriptEntry]
-              }).then(() => {
-                // Close the temporary tab
-                chrome.tabs.remove(tab.id);
-              });
-            });
-          });
+        // Calculate transcript stats in memory without creating temp tab
+        try {
+          if (typeof TranscriptStats !== 'undefined') {
+            TranscriptStats.calculateTranscriptStats(transcriptEntry);
+          } else {
+            // We need to use a temporary tab for stats since importScripts doesn't work in service workers
+            createTemporaryTabForStats(transcriptEntry);
+          }
+        } catch (statsError) {
+          console.error('Error calculating stats in background:', statsError);
+          // Fallback to the temp tab method
+          createTemporaryTabForStats(transcriptEntry);
         }
         
-        // Notify user that the transcript is ready to view
-        chrome.tabs.create({ url: 'transcripts.html' });
+        // Notify user that the transcript is ready to view, but only if we haven't
+        // already opened a transcript page for this session
+        if (!transcriptPageOpened) {
+          console.log("Opening transcript page for session", transcriptEntry.sessionId);
+          chrome.tabs.create({ url: 'transcripts.html' });
+          transcriptPageOpened = true;
+          
+          // Reset the flag after a certain period to allow new tabs for future sessions
+          setTimeout(() => {
+            transcriptPageOpened = false;
+            console.log("Reset transcriptPageOpened flag");
+          }, 30000); // Reset after 30 seconds
+        }
         
         // Clear current transcript after saving
         currentTranscript = '';
@@ -364,6 +385,57 @@ function saveTranscriptToStorage(text, sender, sessionId, meetingCode) {
       console.error('Backup saving also failed:', backupError);
     }
   }
+}
+
+// Function to create a temporary tab for stats when needed
+function createTemporaryTabForStats(transcriptEntry) {
+  console.log("Creating temporary background tab for stats calculation");
+  chrome.tabs.create({ 
+    url: 'about:blank',
+    active: false
+  }, (tab) => {
+    // Set a timeout to ensure the tab gets closed even if something fails
+    const tabCloseTimeout = setTimeout(() => {
+      console.log("Safety timeout: closing stats calculation tab", tab.id);
+      try {
+        chrome.tabs.remove(tab.id);
+      } catch (e) {
+        console.error("Error closing tab in safety timeout:", e);
+      }
+    }, 10000); // 10 second safety timeout
+    
+    // Load transcript_stats.js in the tab
+    chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['transcript_stats.js']
+    }).then(() => {
+      // Calculate stats
+      chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        func: calculateStats,
+        args: [transcriptEntry]
+      }).then(() => {
+        // Clear the safety timeout
+        clearTimeout(tabCloseTimeout);
+        
+        // Close the temporary tab
+        console.log("Stats calculation complete, closing temporary tab", tab.id);
+        chrome.tabs.remove(tab.id).catch(e => {
+          console.error("Error closing temporary tab:", e);
+        });
+      }).catch(error => {
+        console.error("Error executing stats calculation:", error);
+        // Make sure to clean up the tab
+        clearTimeout(tabCloseTimeout);
+        chrome.tabs.remove(tab.id).catch(e => console.error("Cleanup error:", e));
+      });
+    }).catch(error => {
+      console.error("Error loading transcript_stats.js:", error);
+      // Make sure to clean up the tab
+      clearTimeout(tabCloseTimeout);
+      chrome.tabs.remove(tab.id).catch(e => console.error("Cleanup error:", e));
+    });
+  });
 }
 
 // Function to calculate stats for a transcript in a temporary tab

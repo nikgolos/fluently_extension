@@ -181,7 +181,7 @@ function isMeetingActive() {
     console.log("Meeting has ended, stopping recording");
     stopRecording();
     
-    // Explicitly signal to save the transcript
+    // Explicitly signal to save the transcript - but only if not already done
     if (lastTranscript && !hasReportedFinalTranscript) {
       saveTranscriptOnMeetingEnd();
     }
@@ -195,6 +195,13 @@ function isMeetingActive() {
 // Function to explicitly save transcript when meeting ends
 function saveTranscriptOnMeetingEnd() {
   console.log('Meeting ended, explicitly saving transcript:', lastTranscript);
+  
+  // Skip if we've already reported the final transcript
+  if (hasReportedFinalTranscript) {
+    console.log('Final transcript already reported, skipping duplicate save');
+    return;
+  }
+  
   hasReportedFinalTranscript = true;
   
   // Mark the current segment as complete
@@ -215,16 +222,9 @@ function saveTranscriptOnMeetingEnd() {
   
   chrome.storage.local.set(data);
   
-  // Also try to send via messages
+  // Send a single message to save transcript - use meetingEnded type for clarity
   chrome.runtime.sendMessage({
     type: 'meetingEnded',
-    sessionId: sessionId,
-    text: lastTranscript.trim()
-  });
-  
-  // Also send a regular finalTranscript message as a backup
-  chrome.runtime.sendMessage({
-    type: 'finalTranscript',
     sessionId: sessionId,
     text: lastTranscript.trim()
   });
@@ -326,7 +326,7 @@ function startMeetingEndDetection() {
       console.log("Meeting end detected, stopping recording");
       stopRecording();
       
-      // Explicitly save transcript
+      // Explicitly save transcript - but only if not already done
       if (lastTranscript && !hasReportedFinalTranscript) {
         saveTranscriptOnMeetingEnd();
       }
@@ -385,7 +385,7 @@ new MutationObserver(() => {
       console.log("Meeting end detected via DOM change!");
       stopRecording();
       
-      // Explicitly save transcript
+      // Explicitly save transcript - but only if not already done
       if (lastTranscript && !hasReportedFinalTranscript) {
         saveTranscriptOnMeetingEnd();
       }
@@ -814,18 +814,20 @@ function stopRecording() {
   // Stop auto-save
   stopAutoSave();
   
-  // Report the final transcript
+  // Report the final transcript only if not already reported
   if (lastTranscript && !hasReportedFinalTranscript) {
     console.log('Reporting final transcript:', lastTranscript);
+    
+    // Mark as reported to prevent duplicate calls
+    hasReportedFinalTranscript = true;
+    
+    // Save the transcript directly via the meetingEnded message
+    // This is cleaner than sending finalTranscript and then saveTranscriptOnMeetingEnd
     chrome.runtime.sendMessage({
-      type: 'finalTranscript',
+      type: 'meetingEnded',
       sessionId: sessionId,
       text: lastTranscript.trim()
     });
-    hasReportedFinalTranscript = true;
-    
-    // Also save as complete session
-    saveTranscriptOnMeetingEnd();
   }
   
   updateRecordingStatus();
