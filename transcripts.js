@@ -25,11 +25,11 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="stat-value" id="wpmValue">-</div>
     </div>
     <div class="stat-card">
-      <div class="stat-title">Meeting Length</div>
+      <div class="stat-title">Meeting Duration</div>
       <div class="stat-value" id="meetingLengthValue">-</div>
     </div>
     <div class="stat-card">
-      <div class="stat-title">User Speaking Time</div>
+      <div class="stat-title">Your Speaking Time</div>
       <div class="stat-value" id="speakingTimeValue">-</div>
     </div>
   `;
@@ -271,7 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Include stats in the CSV if available
       let statsInfo = '';
       if (stats) {
-        statsInfo = `\nTotal Words,${stats.total_words || 0}\nUnique Words,${stats.unique_words_amount}\nWords Per Minute,${stats.words_per_minute}\nMeeting Length,${stats.meeting_length}\nUser Speaking Time,${stats.speaking_time}`;
+        statsInfo = `\nTotal Words,${stats.total_words || 0}\nUnique Words,${stats.unique_words_amount}\nWords Per Minute,${stats.words_per_minute}\nMeeting Duration,${stats.meeting_length}\nYour Speaking Time,${stats.speaking_time}`;
       }
       
       // Create CSV content

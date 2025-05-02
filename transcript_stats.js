@@ -160,7 +160,7 @@ function calculateTranscriptStats(transcript) {
     hasTimestamps: fixedText.includes('[S:') && fixedText.includes('[E:')
   });
   
-  // Calculate meeting length and speaking time using the fixed text
+  // Calculate Meeting Duration and speaking time using the fixed text
   const { meetingLength, speakingTime, speakingTimeSeconds } = calculateTimeStats(fixedText);
   
   // Calculate words per minute using the corrected speaking time
@@ -201,7 +201,7 @@ function calculateTranscriptStats(transcript) {
   return stats;
 }
 
-// Calculate meeting length and speaking time from transcript
+// Calculate Meeting Duration and speaking time from transcript
 function calculateTimeStats(text) {
   // Extract all timestamp pairs
   const startTimeRegex = /\[S:(\d+\.\d+)s\]/g;
@@ -301,11 +301,11 @@ function calculateTimeStats(text) {
     console.log(`Merged interval: ${segment.start}s to ${segment.end}s = ${duration}s`);
   }
   
-  // Calculate meeting length (take the last end time as meeting length)
+  // Calculate Meeting Duration (take the last end time as Meeting Duration)
   const meetingLengthSeconds = Math.max(...endTimes);
   
   console.log("Total speaking time (after merging overlaps):", totalSpeakingTimeSeconds, "seconds");
-  console.log("Meeting length:", meetingLengthSeconds, "seconds");
+  console.log("Meeting Duration:", meetingLengthSeconds, "seconds");
   
   return {
     meetingLength: formatTimeDisplay(meetingLengthSeconds),

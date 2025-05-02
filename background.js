@@ -353,8 +353,8 @@ function saveTranscriptToStorage(text, sender, sessionId, meetingCode) {
         // Notify user that the transcript is ready to view, but only if we haven't
         // already opened a transcript page for this session
         if (!transcriptPageOpened) {
-          console.log("Opening transcript page for session", transcriptEntry.sessionId);
-          chrome.tabs.create({ url: 'transcripts.html' });
+          console.log("Opening post-meeting stats page for session", transcriptEntry.sessionId);
+          chrome.tabs.create({ url: `post_meeting.html?id=${transcriptEntry.id || transcriptEntry.sessionId}` });
           transcriptPageOpened = true;
           
           // Reset the flag after a certain period to allow new tabs for future sessions
@@ -446,7 +446,10 @@ function calculateStats(transcript) {
 }
 
 function openTranscriptsPage() {
+  // For now, still use the transcripts.html page when explicitly opening transcripts
   chrome.tabs.create({ url: 'transcripts.html' });
+  
+  // TODO: In the future, create a page to show all meeting transcripts using the new design
 }
 
 // Listen for runtime install or update events

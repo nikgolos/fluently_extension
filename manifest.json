@@ -32,7 +32,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["transcript_stats.js"],
+      "resources": ["transcript_stats.js", "post_meeting.js", "post_meeting.html"],
       "matches": ["<all_urls>"]
     }
   ],
