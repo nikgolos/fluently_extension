@@ -29,6 +29,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const transcripts = result.transcripts || [];
       const allStats = result.transcript_stats || {};
       
+      console.log("Loaded transcripts:", transcripts);
+      console.log("Loaded stats:", allStats);
+      
       // Find the transcript
       const transcript = transcripts.find(t => t.id === id || t.sessionId === id);
       
@@ -37,8 +40,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
       
+      console.log("Found transcript:", transcript);
+      
       // Get stats for this transcript
       const stats = allStats[id] || {};
+      console.log("Stats for transcript:", stats);
       
       // Display transcript info
       displayTranscriptInfo(transcript, stats);
@@ -50,6 +56,9 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // Function to display transcript info and stats
   function displayTranscriptInfo(transcript, stats) {
+    console.log("Displaying info for transcript:", transcript.id);
+    console.log("Stats object:", stats);
+    
     // Format the date nicely
     const date = new Date(transcript.timestamp);
     const formattedDate = date.toLocaleDateString(undefined, {
@@ -65,12 +74,32 @@ document.addEventListener('DOMContentLoaded', () => {
     // Show date and time in small text below header
     meetingTimeElement.textContent = `${formattedDate} · ${formattedTime}`;
     
-    // Stats
+    // Stats - correctly access properties and provide fallbacks
     if (stats) {
-      meetingLengthElement.textContent = stats.formattedMeetingLength || '00h 00m 00s';
-      speakingTimeElement.textContent = stats.formattedSpeakingTime || '00h 00m 00s';
-      totalWordsElement.textContent = stats.totalWords || '0';
-      wpmElement.textContent = stats.wordsPerMinute || '0';
+      // Meeting length - check for both direct and formatted fields
+      meetingLengthElement.textContent = stats.meeting_length || stats.formattedMeetingLength || '00h 00m 00s';
+      
+      // Speaking time - check for both direct and formatted fields
+      speakingTimeElement.textContent = stats.speaking_time || stats.formattedSpeakingTime || '00h 00m 00s';
+      
+      // Total words - check both naming conventions
+      totalWordsElement.textContent = stats.total_words || stats.totalWords || '0';
+      
+      // Words per minute - check both naming conventions
+      wpmElement.textContent = stats.words_per_minute || stats.wordsPerMinute || '0';
+      
+      console.log("Displayed stats:", {
+        meetingLength: meetingLengthElement.textContent,
+        speakingTime: speakingTimeElement.textContent,
+        totalWords: totalWordsElement.textContent,
+        wpm: wpmElement.textContent
+      });
+    } else {
+      console.warn("No stats found for transcript:", transcript.id);
+      meetingLengthElement.textContent = '00h 00m 00s';
+      speakingTimeElement.textContent = '00h 00m 00s';
+      totalWordsElement.textContent = '0';
+      wpmElement.textContent = '0';
     }
     
     // Add animation to stat cards
