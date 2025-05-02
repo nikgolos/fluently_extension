@@ -16,8 +16,8 @@ let isEnglishDetected = false;
 let languageCheckInterval = null;
 let languageCheckCount = 0;
 let speechSamples = [];
-const MIN_SPEECH_SAMPLES = 3;
-const LANGUAGE_CONFIDENCE_THRESHOLD = 0.85; // Set threshold to 0.85
+const MIN_SPEECH_SAMPLES = 2;
+const LANGUAGE_CONFIDENCE_THRESHOLD = 0.8; // Lower threshold to 0.8
 let speechStartDetectionTime = null;
 
 // Function to generate a unique session ID
@@ -540,7 +540,7 @@ function startRecording() {
               clearInterval(languageCheckInterval);
               languageCheckInterval = null;
             }
-          }, 3000);
+          }, 2000);
         }
       };
 
@@ -578,16 +578,16 @@ function startRecording() {
               confidence: Math.max(...confidenceScores)
             });
             
-            // Check if we've been detecting for at least 3 seconds and have enough samples
+            // Check if we've been detecting for at least 2 seconds and have enough samples
             const speechDetectionTimePassed = new Date() - speechStartDetectionTime;
             console.log(`Speech detection time: ${speechDetectionTimePassed}ms`);
             
-            // Only make a determination after we have collected enough samples and 3 seconds have passed
-            if (speechSamples.length >= MIN_SPEECH_SAMPLES && speechDetectionTimePassed >= 3000) {
+            // Only make a determination after we have collected enough samples and 2 seconds have passed
+            if (speechSamples.length >= MIN_SPEECH_SAMPLES && speechDetectionTimePassed >= 2000) {
               // Get average confidence score
               const avgConfidence = speechSamples.reduce((sum, sample) => sum + sample.confidence, 0) / speechSamples.length;
               
-              console.log(`Language detection after 3 seconds: Confidence=${avgConfidence.toFixed(2)}`);
+              console.log(`Language detection after 2 seconds: Confidence=${avgConfidence.toFixed(2)}`);
               
               if (avgConfidence >= LANGUAGE_CONFIDENCE_THRESHOLD) {
                 console.log("English speech confirmed with confidence:", avgConfidence);
@@ -617,7 +617,7 @@ function startRecording() {
               speechSamples = speechSamples.slice(-5);
             } else {
               // Not enough samples or time yet
-              console.log(`Collecting speech samples: ${speechSamples.length}/${MIN_SPEECH_SAMPLES}, Time: ${speechDetectionTimePassed}ms/3000ms`);
+              console.log(`Collecting speech samples: ${speechSamples.length}/${MIN_SPEECH_SAMPLES}, Time: ${speechDetectionTimePassed}ms/2000ms`);
               return;
             }
           }
@@ -1122,7 +1122,7 @@ function startStandardRecognition() {
             clearInterval(languageCheckInterval);
             languageCheckInterval = null;
           }
-        }, 3000);
+        }, 2000);
       }
     };
     
@@ -1180,16 +1180,16 @@ function startStandardRecognition() {
             confidence: Math.max(...confidenceScores)
           });
           
-          // Check if we've been detecting for at least 3 seconds and have enough samples
+          // Check if we've been detecting for at least 2 seconds and have enough samples
           const speechDetectionTimePassed = new Date() - speechStartDetectionTime;
           console.log(`Speech detection time: ${speechDetectionTimePassed}ms`);
           
-          // Only make a determination after we have collected enough samples and 3 seconds have passed
-          if (speechSamples.length >= MIN_SPEECH_SAMPLES && speechDetectionTimePassed >= 3000) {
+          // Only make a determination after we have collected enough samples and 2 seconds have passed
+          if (speechSamples.length >= MIN_SPEECH_SAMPLES && speechDetectionTimePassed >= 2000) {
             // Get average confidence score
             const avgConfidence = speechSamples.reduce((sum, sample) => sum + sample.confidence, 0) / speechSamples.length;
             
-            console.log(`Language detection after 3 seconds: Confidence=${avgConfidence.toFixed(2)}`);
+            console.log(`Language detection after 2 seconds: Confidence=${avgConfidence.toFixed(2)}`);
             
             if (avgConfidence >= LANGUAGE_CONFIDENCE_THRESHOLD) {
               console.log("English speech confirmed with confidence:", avgConfidence);
@@ -1219,7 +1219,7 @@ function startStandardRecognition() {
             speechSamples = speechSamples.slice(-5);
           } else {
             // Not enough samples or time yet
-            console.log(`Collecting speech samples: ${speechSamples.length}/${MIN_SPEECH_SAMPLES}, Time: ${speechDetectionTimePassed}ms/3000ms`);
+            console.log(`Collecting speech samples: ${speechSamples.length}/${MIN_SPEECH_SAMPLES}, Time: ${speechDetectionTimePassed}ms/2000ms`);
             return;
           }
         }
