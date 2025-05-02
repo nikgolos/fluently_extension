@@ -16,8 +16,8 @@ let isEnglishDetected = false;
 let languageCheckInterval = null;
 let languageCheckCount = 0;
 let speechSamples = [];
-const MIN_SPEECH_SAMPLES = 2;
-const LANGUAGE_CONFIDENCE_THRESHOLD = 0.8; // Lower threshold to 0.8
+const MIN_SPEECH_SAMPLES = 3;
+const LANGUAGE_CONFIDENCE_THRESHOLD = 0.85; // Lower threshold to 0.8
 let speechStartDetectionTime = null;
 
 // Function to generate a unique session ID

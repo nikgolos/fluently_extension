@@ -17,11 +17,27 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
   
-  // Load transcript data
-  loadTranscriptData(transcriptId);
+  // Load TranscriptStats script first, then proceed
+  loadScript('transcript_stats.js', () => {
+    // Load transcript data
+    loadTranscriptData(transcriptId);
+  });
   
   // Setup button handlers
   setupButtonHandlers();
+  
+  // Helper function to load a script
+  function loadScript(scriptPath, callback) {
+    const script = document.createElement('script');
+    script.src = scriptPath;
+    script.onload = callback;
+    script.onerror = (error) => {
+      console.error(`Error loading script ${scriptPath}:`, error);
+      // Continue anyway, as we'll calculate stats manually if needed
+      callback();
+    };
+    document.head.appendChild(script);
+  }
   
   // Function to load transcript data
   function loadTranscriptData(id) {
@@ -42,9 +58,40 @@ document.addEventListener('DOMContentLoaded', () => {
       
       console.log("Found transcript:", transcript);
       
-      // Get stats for this transcript
-      const stats = allStats[id] || {};
+      // Get stats for this transcript - try multiple IDs
+      let stats = allStats[id] || {}; // Try URL parameter ID first
+      
+      // If no stats found, try transcript.id
+      if (Object.keys(stats).length === 0 && transcript.id && transcript.id !== id) {
+        stats = allStats[transcript.id] || {};
+        console.log("Tried transcript.id for stats:", transcript.id, stats);
+      }
+      
+      // If still no stats, try sessionId
+      if (Object.keys(stats).length === 0 && transcript.sessionId && transcript.sessionId !== id) {
+        stats = allStats[transcript.sessionId] || {};
+        console.log("Tried transcript.sessionId for stats:", transcript.sessionId, stats);
+      }
+      
       console.log("Stats for transcript:", stats);
+      
+      // If we still have no stats and the transcript has text, calculate them on the fly
+      if (Object.keys(stats).length === 0 && transcript.text) {
+        console.log("No stats found, calculating on the fly");
+        
+        // Check if TranscriptStats is loaded
+        if (typeof window.TranscriptStats !== 'undefined') {
+          stats = window.TranscriptStats.calculateTranscriptStats(transcript);
+          console.log("Calculated stats on the fly:", stats);
+          
+          // Store these stats for future use
+          saveCalculatedStats(stats, transcript.id);
+        } else {
+          console.warn("TranscriptStats module not loaded, calculating basic stats");
+          stats = calculateBasicStats(transcript);
+          console.log("Basic calculated stats:", stats);
+        }
+      }
       
       // Display transcript info
       displayTranscriptInfo(transcript, stats);
@@ -52,6 +99,76 @@ document.addEventListener('DOMContentLoaded', () => {
       // Store transcript for sharing
       window.transcriptData = transcript;
     });
+  }
+  
+  // Save calculated stats to storage
+  function saveCalculatedStats(stats, transcriptId) {
+    chrome.storage.local.get(['transcript_stats'], (result) => {
+      const allStats = result.transcript_stats || {};
+      
+      // Add new stats with transcript ID as key
+      allStats[transcriptId] = stats;
+      
+      // Save back to storage
+      chrome.storage.local.set({ transcript_stats: allStats }, () => {
+        console.log('Transcript stats saved:', stats);
+      });
+    });
+  }
+  
+  // Calculate basic stats if TranscriptStats is not available
+  function calculateBasicStats(transcript) {
+    if (!transcript || !transcript.text) {
+      return {
+        total_words: 0,
+        words_per_minute: 0,
+        meeting_length: '00h 00m 00s',
+        speaking_time: '00h 00m 00s'
+      };
+    }
+    
+    // Count words (rough estimate)
+    const text = transcript.text.replace(/\[S:[^\]]+\]|\[E:[^\]]+\]/g, ''); // Remove timestamps
+    const words = text.trim().split(/\s+/).filter(w => w.length > 0);
+    const totalWords = words.length;
+    
+    // Estimate meeting length (from timestamp if available)
+    let meetingLength = '00h 00m 00s';
+    if (transcript.timestamp) {
+      const meetingDate = new Date(transcript.timestamp);
+      const now = new Date();
+      const diffSeconds = Math.floor((now - meetingDate) / 1000);
+      meetingLength = formatTimeDisplay(diffSeconds);
+    }
+    
+    // Estimate speaking time based on word count (average 150 words per minute)
+    const estimatedSpeakingTimeSeconds = Math.max(Math.round(totalWords / 150 * 60), 1);
+    const speakingTime = formatTimeDisplay(estimatedSpeakingTimeSeconds);
+    
+    // Estimate words per minute
+    const wpm = Math.round(totalWords / (estimatedSpeakingTimeSeconds / 60));
+    
+    return {
+      transcript_id: transcript.id,
+      session_id: transcript.sessionId,
+      meeting_id: transcript.meetingId,
+      total_words: totalWords,
+      words_per_minute: wpm,
+      meeting_length: meetingLength,
+      speaking_time: speakingTime,
+      speaking_time_seconds: estimatedSpeakingTimeSeconds,
+      timestamp: new Date().toISOString(),
+      calculated_on_page: true
+    };
+  }
+  
+  // Format time in seconds to "XXh YYm ZZs" format
+  function formatTimeDisplay(totalSeconds) {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = Math.floor(totalSeconds % 60);
+    
+    return `${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`;
   }
   
   // Function to display transcript info and stats
@@ -75,7 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
     meetingTimeElement.textContent = `${formattedDate} · ${formattedTime}`;
     
     // Stats - correctly access properties and provide fallbacks
-    if (stats) {
+    if (stats && Object.keys(stats).length > 0) {
       // Meeting length - check for both direct and formatted fields
       meetingLengthElement.textContent = stats.meeting_length || stats.formattedMeetingLength || '00h 00m 00s';
       
