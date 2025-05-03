@@ -21,6 +21,10 @@ let hasCheckedLanguage = false;
 const LANGUAGE_DETECTION_WORD_THRESHOLD = 40;
 const LANGUAGE_DETECTION_SAMPLE_SIZE = 20;
 const LANGUAGE_DETECTION_CONFIDENCE_THRESHOLD = 79;
+// Flag to mark if current call is non-English
+let isCurrentCallEnglish = true;
+let currentMeetingCode = null;
+const NON_ENGLISH_BLOCK_EXPIRATION_MS = 60 * 60 * 1000; // 1 hour in milliseconds
 
 // Function to generate a unique session ID
 function generateSessionId() {
@@ -32,7 +36,17 @@ function getMeetingCode() {
   const url = window.location.href;
   const meetRegex = /meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3})/i;
   const match = url.match(meetRegex);
-  return match && match[1] ? match[1] : 'unknown-meeting';
+  const meetingCode = match && match[1] ? match[1] : 'unknown-meeting';
+  
+  // Update current meeting code if it's different
+  if (currentMeetingCode !== meetingCode) {
+    currentMeetingCode = meetingCode;
+    // Reset the English flag for a new meeting
+    isCurrentCallEnglish = true;
+    console.log(`New meeting detected: ${meetingCode}, language checks reset`);
+  }
+  
+  return meetingCode;
 }
 
 // Function to count words in transcript (excluding timestamps)
@@ -117,10 +131,16 @@ async function checkLanguageIsEnglish(text) {
       console.log("[Language Detection]", warningMsg);
       sendLanguageDetectionLog(warningMsg);
       
+      // Stop recording and clear the transcript
       chrome.runtime.sendMessage({
         type: 'warning',
         text: 'Language is not English'
       });
+      
+      // Stop the recording and clear the transcript
+      stopRecordingAndClearTranscript();
+      
+      return false;
     } else {
       const resultMsg = `RESULT: Language is English (score: ${data.confidence})`;
       console.log("[Language Detection]", resultMsg);
@@ -386,83 +406,142 @@ function saveTranscriptOnMeetingEnd() {
 
 // Initialize and auto-start on Google Meet
 function initialize() {
+  console.log("Initializing content script...");
   
-  if (isGoogleMeetPage()) {
-    console.log("Google Meet page detected, starting monitoring...");
-    startMeetingDetection();
+  // Get current meeting code
+  const meetingCode = getMeetingCode();
+  
+  // Check if this meeting is already marked as non-English
+  chrome.storage.local.get([`non_english_meeting_${meetingCode}`], (result) => {
+    const nonEnglishData = result[`non_english_meeting_${meetingCode}`];
     
-    // Initial check if already in a meeting - force immediate check
-    setTimeout(() => {
-      checkAndStartRecording();
-    }, 2000); // Check after 2 seconds to allow UI to fully load
-  }
+    if (nonEnglishData) {
+      console.log(`Found non-English data for meeting ${meetingCode}:`, nonEnglishData);
+      
+      // Check if the block has expired
+      const expirationTime = new Date(nonEnglishData.expirationTime);
+      const currentTime = new Date();
+      
+      if (currentTime > expirationTime) {
+        // The block has expired
+        console.log(`Non-English block for meeting ${meetingCode} has expired. Expired at: ${expirationTime.toLocaleTimeString()}, current time: ${currentTime.toLocaleTimeString()}`);
+        
+        // Reset the flag
+        isCurrentCallEnglish = true;
+        
+        // Remove the expired record
+        chrome.storage.local.remove([`non_english_meeting_${meetingCode}`], () => {
+          console.log(`Removed expired non-English flag for meeting ${meetingCode}`);
+        });
+        
+        // Start detection normally
+        startMeetingDetection();
+      } else {
+        // The block is still active
+        console.log(`Meeting ${meetingCode} is still blocked as non-English until ${expirationTime.toLocaleTimeString()}`);
+        isCurrentCallEnglish = false;
+        
+        const minutesRemaining = Math.round((expirationTime - currentTime) / (60 * 1000));
+        
+        chrome.runtime.sendMessage({
+          type: 'debug',
+          text: `This meeting was previously detected as non-English. Recording is disabled for ${minutesRemaining} more minutes (until ${expirationTime.toLocaleTimeString()}).`
+        });
+      }
+    } else {
+      console.log(`Meeting ${meetingCode} not found in non-English list, proceeding normally`);
+      // Start detection for meeting participation
+      startMeetingDetection();
+    }
+  });
 }
 
 // New function to explicitly check meeting status and start recording if needed
 function checkAndStartRecording() {
-  const isActive = isMeetingActive();
-  const isParticipating = isParticipatingInMeeting();
+  if (!isGoogleMeetPage()) {
+    console.log("Not a Google Meet page, won't start recording");
+    return false;
+  }
   
-  console.log("Explicit meeting check: Active:", isActive, "Participating:", isParticipating, "Recording:", isRecording, "AutoStarted:", autoStarted);
+  // Update the meeting code and check if it's a new meeting
+  getMeetingCode();
   
-  if (isActive && isParticipating && !isRecording && !autoStarted) {
-    console.log("User confirmed in active meeting! Starting recording...");
-    startRecording();
-    autoStarted = true;
-    startMeetingEndDetection();
-    
+  // Check if the current call is marked as non-English
+  if (!isCurrentCallEnglish) {
+    console.log("Won't auto-start recording: this call was detected as non-English");
     chrome.runtime.sendMessage({
       type: 'debug',
-      text: 'Meeting participation confirmed - Starting recording'
+      text: 'Auto-recording disabled: this call was detected as non-English'
     });
-  } else if (!isParticipating) {
-    console.log("User not participating yet. Will continue monitoring...");
-    
-    // Try again after a delay if we're on a meeting page but not participating yet
-    if (isGoogleMeetPage() && !autoStarted) {
-      setTimeout(checkAndStartRecording, 3000);
-    }
+    return false;
   }
+  
+  if (!isParticipatingInMeeting()) {
+    console.log("Not actively participating in meeting, won't start recording");
+    return false;
+  }
+  
+  if (isRecording) {
+    console.log("Already recording, won't start again");
+    return false;
+  }
+  
+  console.log("Meeting participation detected - Starting recording automatically");
+  autoStarted = true;
+  
+  // Send notification that recording is starting automatically
+  chrome.runtime.sendMessage({
+    type: 'debug',
+    text: 'Meeting detected - Recording started automatically'
+  });
+  
+  // Start recording
+  startRecording();
+  
+  // Also start checking for when the meeting ends
+  startMeetingEndDetection();
+  
+  return true;
 }
 
 // Start continuous meeting detection
 function startMeetingDetection() {
+  // Clear any existing meeting detection interval
   if (meetingDetectionInterval) {
     clearInterval(meetingDetectionInterval);
+    meetingDetectionInterval = null;
   }
   
-  console.log("Starting meeting participation detection...");
+  // Initial check
+  const initialMeetingCode = getMeetingCode();
+  console.log(`Starting meeting detection for meeting: ${initialMeetingCode}`);
   
-  // Do an immediate check first
-  checkAndStartRecording();
+  // Immediately check if we're in a meeting and should start recording
+  if (isGoogleMeetPage() && isParticipatingInMeeting() && !isRecording && isCurrentCallEnglish) {
+    checkAndStartRecording();
+  }
   
+  // Set up interval to check for meeting participation
+  console.log("Setting up meeting detection interval...");
   meetingDetectionInterval = setInterval(() => {
-    const isOnMeetPage = isGoogleMeetPage();
-    const isActive = isMeetingActive();
-    const isParticipating = isParticipatingInMeeting();
+    const meetingCode = getMeetingCode(); // This updates currentMeetingCode and may reset isCurrentCallEnglish
     
-    console.log("Meeting detection: Page:", isOnMeetPage, "Active:", isActive, "Participating:", isParticipating);
-    
-    // If we're on a Meet page, the meeting is active, we're participating, and not already recording
-    if (isOnMeetPage && isActive && isParticipating && !isRecording && !autoStarted) {
-      console.log("User detected in active meeting! Starting recording automatically...");
-      startRecording();
-      autoStarted = true;
-      startMeetingEndDetection();
-      
-      // Notify user that recording has started automatically
-      chrome.runtime.sendMessage({
-        type: 'debug',
-        text: 'Meeting detected - Recording started automatically'
-      });
+    if (!isGoogleMeetPage()) {
+      console.log("Not on a Google Meet page, skipping detection");
+      return;
     }
     
-    // If we're not in an active meeting anymore but recording is still on, stop it
-    if ((!isParticipating || !isActive) && isRecording) {
-      console.log("User no longer in active meeting. Stopping recording...");
-      stopRecording();
+    // Skip detection if this call is marked as non-English
+    if (!isCurrentCallEnglish) {
+      console.log(`Meeting ${meetingCode} is marked as non-English, skipping detection`);
+      return;
     }
-  }, 3000); // Check every 3 seconds instead of 5
+    
+    if (isParticipatingInMeeting() && !isRecording) {
+      console.log("Meeting participation detected!");
+      checkAndStartRecording();
+    }
+  }, 5000); // Check every 5 seconds
 }
 
 // Start meeting end detection
@@ -632,6 +711,19 @@ function startRecording() {
     // Check if meeting is active first
     if (!isMeetingActive()) {
       throw new Error('Cannot start recording: the meeting has ended');
+    }
+    
+    // Get current meeting code
+    getMeetingCode(); // This will update currentMeetingCode and isCurrentCallEnglish if needed
+    
+    // Check if the current call is marked as non-English
+    if (!isCurrentCallEnglish) {
+      console.log("Cannot start recording: this call was detected as non-English");
+      chrome.runtime.sendMessage({
+        type: 'debug',
+        text: 'Cannot start recording: this call was detected as non-English'
+      });
+      return;
     }
     
     console.log("Starting recording...");
@@ -1288,5 +1380,64 @@ function detectVoiceActivity(audioData) {
   
   // Return true if energy is above threshold (voice detected)
   return energy > vadEnergyThreshold;
+}
+
+// Function to stop recording and clear the transcript when non-English is detected
+function stopRecordingAndClearTranscript() {
+  console.log("[Language Detection] Non-English language detected - stopping recording and clearing transcript");
+  sendLanguageDetectionLog("Non-English detected! Stopping recording and deleting transcript");
+  
+  // Mark this call as non-English
+  isCurrentCallEnglish = false;
+  
+  // Get the current meeting code and store it
+  const meetingCode = getMeetingCode();
+  const currentTime = new Date();
+  
+  // Save to local storage that this meeting is non-English with timestamp
+  const data = { 
+    [`non_english_meeting_${meetingCode}`]: {
+      meetingCode: meetingCode,
+      timestamp: currentTime.toISOString(),
+      isEnglish: false,
+      expirationTime: new Date(currentTime.getTime() + NON_ENGLISH_BLOCK_EXPIRATION_MS).toISOString()
+    }
+  };
+  
+  chrome.storage.local.set(data, () => {
+    console.log(`Meeting ${meetingCode} marked as non-English in storage until ${new Date(currentTime.getTime() + NON_ENGLISH_BLOCK_EXPIRATION_MS).toLocaleTimeString()}`);
+  });
+  
+  // Clean up recognition
+  cleanupRecognition();
+  
+  // Reset recording state
+  isRecording = false;
+  
+  // Stop auto-save
+  stopAutoSave();
+  
+  // Clear the transcript
+  lastTranscript = '';
+  
+  // Mark as reported to prevent automatic save
+  hasReportedFinalTranscript = true;
+  
+  // Update recording status
+  updateRecordingStatus();
+  
+  // Notify popup
+  chrome.runtime.sendMessage({
+    type: 'debug',
+    text: `Recording stopped and transcript deleted because non-English language was detected. Recording will be blocked for this meeting URL for 1 hour (until ${new Date(currentTime.getTime() + NON_ENGLISH_BLOCK_EXPIRATION_MS).toLocaleTimeString()}).`
+  });
+  
+  // Also send a specific message type for non-English detection
+  chrome.runtime.sendMessage({
+    type: 'nonEnglishDetected',
+    sessionId: sessionId,
+    meetingCode: meetingCode,
+    expirationTime: new Date(currentTime.getTime() + NON_ENGLISH_BLOCK_EXPIRATION_MS).toISOString()
+  });
 }
 

@@ -302,6 +302,11 @@ document.addEventListener('DOMContentLoaded', () => {
         logDebug('Meeting detected - Recording started automatically!');
       } else if (message.text.includes('Duplicate transcript detected')) {
         logDebug('Note: This transcript was already saved previously.');
+      } else if (message.text.includes('transcript deleted because non-English language was detected')) {
+        updateStatus('Recording stopped - Non-English detected', false);
+        logDebug('Recording stopped and transcript deleted because language is not English.');
+        // Make the language logs area flash to draw attention
+        highlightLanguageLogs();
       }
     } else if (message.type === 'error') {
       logDebug('Error: ' + message.error);
@@ -313,7 +318,43 @@ document.addEventListener('DOMContentLoaded', () => {
         updateStatus(message.isRecording ? 'Recording in progress' : 'Ready', message.isRecording);
       }
     } else if (message.type === 'warning' && message.text === 'Language is not English') {
-      addLanguageLog(`Warning: Language is not English`);
+      addLanguageLog(`Warning: Language is not English - Recording stopped and transcript deleted`);
+      // Highlight the log area to draw attention
+      highlightLanguageLogs();
+    } else if (message.type === 'nonEnglishDetected') {
+      updateStatus('Non-English detected - Recording stopped', false);
+      startButton.disabled = false;
+      
+      // Parse the expiration time to show when recording will be available again
+      const expirationTime = message.expirationTime ? new Date(message.expirationTime) : null;
+      const expirationMessage = expirationTime ? 
+        ` Recording blocked until ${expirationTime.toLocaleTimeString()}` : '';
+      
+      addLanguageLog(`Non-English language detected - Recording has been stopped and transcript deleted.${expirationMessage}`);
+      
+      // Highlight the log area to draw attention
+      highlightLanguageLogs();
     }
   });
+  
+  // Function to highlight the language logs area to draw attention
+  function highlightLanguageLogs() {
+    // Save the original background color
+    const originalColor = languageLogsArea.style.backgroundColor;
+    
+    // Flash the background color a few times
+    languageLogsArea.style.backgroundColor = '#ffcccc';
+    
+    setTimeout(() => {
+      languageLogsArea.style.backgroundColor = originalColor;
+      
+      setTimeout(() => {
+        languageLogsArea.style.backgroundColor = '#ffcccc';
+        
+        setTimeout(() => {
+          languageLogsArea.style.backgroundColor = originalColor;
+        }, 500);
+      }, 500);
+    }, 500);
+  }
 }); 

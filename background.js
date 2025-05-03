@@ -68,6 +68,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   } else if (message.type === 'debug' && message.text && message.text.includes('[Language Detection]')) {
     console.log("Forwarding language detection log:", message);
     chrome.runtime.sendMessage(message);
+  } else if (message.type === 'nonEnglishDetected') {
+    console.log("Non-English language detected, transcript deleted:", message);
+    // Forward this message to popup
+    chrome.runtime.sendMessage(message);
+    // Clear any pending transcript operations
+    sessionIdProcessed = message.sessionId;
   }
   
   if (message.type === 'finalTranscript') {
