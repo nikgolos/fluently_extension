@@ -15,6 +15,12 @@ let vadEnergyThreshold = 0.01;
 let lastEnergyLevel = 0;
 let energySamples = [];
 const ENERGY_SAMPLE_COUNT = 10;
+// For language detection
+let wordCount = 0;
+let hasCheckedLanguage = false;
+const LANGUAGE_DETECTION_WORD_THRESHOLD = 40;
+const LANGUAGE_DETECTION_SAMPLE_SIZE = 20;
+const LANGUAGE_DETECTION_CONFIDENCE_THRESHOLD = 79;
 
 // Function to generate a unique session ID
 function generateSessionId() {
@@ -29,6 +35,123 @@ function getMeetingCode() {
   return match && match[1] ? match[1] : 'unknown-meeting';
 }
 
+// Function to count words in transcript (excluding timestamps)
+function countWordsInTranscript(text) {
+  if (!text) return 0;
+  
+  // Remove timestamp markers
+  const timestampRegex = /\[\s*[SE]:\s*\d+(?:\.\d+)?s\s*\]/g;
+  const cleanedText = text.replace(timestampRegex, ' ');
+  
+  // Normalize spaces and split by space
+  const words = cleanedText.replace(/\s+/g, ' ').trim().split(' ');
+  return words.filter(word => word.length > 0).length;
+}
+
+// Function to get the last N words from transcript
+function getLastNWords(text, n) {
+  if (!text) return '';
+  
+  // Remove timestamp markers
+  const timestampRegex = /\[\s*[SE]:\s*\d+(?:\.\d+)?s\s*\]/g;
+  const cleanedText = text.replace(timestampRegex, ' ');
+  
+  // Normalize spaces and split by space
+  const words = cleanedText.replace(/\s+/g, ' ').trim().split(' ')
+    .filter(word => word.length > 0);
+  
+  // Get last n words
+  return words.slice(-n).join(' ');
+}
+
+// Function to check if language is English
+async function checkLanguageIsEnglish(text) {
+  if (!text) return true;
+  
+  const logMessage = `Checking language for text: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`;
+  console.log("[Language Detection]", logMessage);
+  sendLanguageDetectionLog(logMessage);
+  
+  console.log("[Language Detection] Text length:", text.length, "characters");
+  sendLanguageDetectionLog(`Text length: ${text.length} characters`);
+  
+  const trimmedText = text.substring(0, 250); // Respect the 250 char limit
+  const requestBody = JSON.stringify({ text: trimmedText });
+  
+  try {
+    console.log("[Language Detection] Sending API request to http://localhost:8000/detect_language");
+    console.log("[Language Detection] Request body:", requestBody);
+    sendLanguageDetectionLog("Sending API request...");
+    sendLanguageDetectionLog(`Request body: ${requestBody}`);
+    
+    const response = await fetch('http://localhost:8000/detect_language', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: requestBody,
+    });
+    
+    console.log("[Language Detection] Response status:", response.status);
+    sendLanguageDetectionLog(`Response status: ${response.status}`);
+    
+    if (!response.ok) {
+      const responseText = await response.text();
+      const errorMsg = `Language detection API error: ${response.status}, Response: ${responseText}`;
+      console.error("[Language Detection]", errorMsg);
+      sendLanguageDetectionLog(errorMsg);
+      throw new Error(errorMsg);
+    }
+    
+    const data = await response.json();
+    console.log("[Language Detection] API response:", data);
+    console.log("[Language Detection] Confidence score:", data.confidence);
+    console.log("[Language Detection] Cached result:", data.cached ? "Yes" : "No");
+    
+    sendLanguageDetectionLog(`Response: Confidence=${data.confidence}, Cached=${data.cached}`);
+    
+    const isEnglish = data.confidence >= LANGUAGE_DETECTION_CONFIDENCE_THRESHOLD;
+    
+    if (!isEnglish) {
+      const warningMsg = `RESULT: Language is not English (score: ${data.confidence})`;
+      console.log("[Language Detection]", warningMsg);
+      sendLanguageDetectionLog(warningMsg);
+      
+      chrome.runtime.sendMessage({
+        type: 'warning',
+        text: 'Language is not English'
+      });
+    } else {
+      const resultMsg = `RESULT: Language is English (score: ${data.confidence})`;
+      console.log("[Language Detection]", resultMsg);
+      sendLanguageDetectionLog(resultMsg);
+    }
+    
+    return isEnglish;
+  } catch (error) {
+    const errorMsg = `ERROR: ${error.message}`;
+    console.error("[Language Detection]", errorMsg);
+    sendLanguageDetectionLog(errorMsg);
+    
+    // Report failure to the UI
+    chrome.runtime.sendMessage({
+      type: 'warning',
+      text: 'Language detection failed'
+    });
+    
+    // Mark check as failed instead of assuming English - don't need to log this twice
+    return "FAILED"; // Return a non-boolean value to indicate failure
+  }
+}
+
+// Function to send language detection logs to popup
+function sendLanguageDetectionLog(message) {
+  chrome.runtime.sendMessage({
+    type: 'debug',
+    text: `[Language Detection] ${message}`
+  });
+}
+
 // Function to save transcript segments to chrome.storage
 function saveTranscriptSegment(force = false) {
   if (!isRecording || !lastTranscript) return;
@@ -38,6 +161,41 @@ function saveTranscriptSegment(force = false) {
   
   const now = new Date();
   console.log(`Saving transcript segment (${lastTranscript.length} chars, last saved: ${lastSavedLength} chars)`);
+  
+  // Check word count and detect language if needed
+  const currentWordCount = countWordsInTranscript(lastTranscript);
+  
+  console.log("[Language Detection] Current word count:", currentWordCount, "Has checked language:", hasCheckedLanguage);
+  sendLanguageDetectionLog(`Current word count: ${currentWordCount}`);
+  
+  if (currentWordCount >= LANGUAGE_DETECTION_WORD_THRESHOLD && !hasCheckedLanguage) {
+    console.log(`[Language Detection] Word threshold reached (${LANGUAGE_DETECTION_WORD_THRESHOLD} words). Proceeding with language check...`);
+    sendLanguageDetectionLog(`Word threshold reached (${LANGUAGE_DETECTION_WORD_THRESHOLD} words)`);
+    
+    hasCheckedLanguage = true;
+    
+    // Get last N words for language detection
+    const lastWords = getLastNWords(lastTranscript, LANGUAGE_DETECTION_SAMPLE_SIZE);
+    console.log(`[Language Detection] Extracted last ${LANGUAGE_DETECTION_SAMPLE_SIZE} words:`, lastWords);
+    sendLanguageDetectionLog(`Analyzing last ${LANGUAGE_DETECTION_SAMPLE_SIZE} words...`);
+    
+    // Check if language is English
+    checkLanguageIsEnglish(lastWords).then(result => {
+      if (result === "FAILED") {
+        console.log("[Language Detection] Check failed. Unable to determine language.");
+        // The error message is already logged in checkLanguageIsEnglish
+      } else {
+        console.log("[Language Detection] Check completed. Is English:", result);
+        sendLanguageDetectionLog(`Check completed. Is English: ${result}`);
+      }
+    }).catch(error => {
+      console.error("[Language Detection] Error in language check:", error);
+      // Don't duplicate logs - errors are already handled in checkLanguageIsEnglish
+    });
+  }
+  
+  // Update word count for next check
+  wordCount = currentWordCount;
   
   const segment = {
     sessionId: sessionId,
@@ -484,6 +642,10 @@ function startRecording() {
     hasReportedFinalTranscript = false;
     lastTranscript = '';
     lastSavedLength = 0;
+    
+    // Reset language detection flag
+    hasCheckedLanguage = false;
+    wordCount = 0;
     
     // Generate a new session ID for this recording
     sessionId = generateSessionId();

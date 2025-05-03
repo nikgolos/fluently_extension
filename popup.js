@@ -3,15 +3,58 @@ document.addEventListener('DOMContentLoaded', () => {
   const stopButton = document.getElementById('stopButton');
   const viewTranscriptsButton = document.getElementById('viewTranscriptsButton');
   const debugArea = document.getElementById('debugArea');
+  const languageLogsArea = document.getElementById('languageLogsArea');
   const statusDiv = document.getElementById('status');
   let currentTranscript = '';
   let isMeetingPage = false;
   let isMeetingActive = false;
   let isParticipating = false;
   let autoDetectionEnabled = true;
+  let languageLogs = [];
 
   function logDebug(message) {
     debugArea.textContent = message;
+  }
+
+  function addLanguageLog(message) {
+    // Add timestamp to log
+    const now = new Date();
+    const timestamp = now.toLocaleTimeString();
+    const formattedLog = `[${timestamp}] ${message}`;
+    
+    // Check if this exact message was logged in the last second (to prevent duplicates)
+    const recentLogs = languageLogs.slice(-5);
+    for (const log of recentLogs) {
+      // Check if we have a very similar recent log (ignore timestamp)
+      const existingMessage = log.substring(log.indexOf(']') + 2);
+      if (existingMessage === message) {
+        // Skip this duplicate message
+        return;
+      }
+    }
+    
+    // Add to our logs array (max 20 entries)
+    languageLogs.push(formattedLog);
+    if (languageLogs.length > 20) {
+      languageLogs.shift(); // Remove oldest log
+    }
+    
+    // Update UI
+    updateLanguageLogs();
+  }
+
+  function updateLanguageLogs() {
+    languageLogsArea.innerHTML = '';
+    
+    languageLogs.forEach(log => {
+      const logEntry = document.createElement('div');
+      logEntry.className = 'log-entry';
+      logEntry.textContent = log;
+      languageLogsArea.appendChild(logEntry);
+    });
+    
+    // Scroll to bottom to show latest logs
+    languageLogsArea.scrollTop = languageLogsArea.scrollHeight;
   }
 
   function updateStatus(statusMessage, isRecording = false) {
@@ -229,7 +272,18 @@ document.addEventListener('DOMContentLoaded', () => {
         logDebug('Interim transcript: ' + message.text);
       }
     } else if (message.type === 'debug') {
+      // Display all debug messages in debug area
       logDebug(message.text);
+      
+      // Check if it's a language detection log and handle it separately
+      if (message.text && message.text.includes('[Language Detection]')) {
+        // Extract just the content part after the prefix
+        let logContent = message.text;
+        if (logContent.includes('[Language Detection]')) {
+          logContent = logContent.split('[Language Detection]')[1].trim();
+        }
+        addLanguageLog(logContent);
+      }
       
       // Update UI based on debug messages
       if (message.text.includes('Saving transcription') || message.text.includes('saving transcript')) {
@@ -258,6 +312,8 @@ document.addEventListener('DOMContentLoaded', () => {
       } else {
         updateStatus(message.isRecording ? 'Recording in progress' : 'Ready', message.isRecording);
       }
+    } else if (message.type === 'warning' && message.text === 'Language is not English') {
+      addLanguageLog(`Warning: Language is not English`);
     }
   });
 }); 

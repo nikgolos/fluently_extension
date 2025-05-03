@@ -61,6 +61,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     currentSessionId = message.sessionId;
   }
   
+  // Forward all language detection related messages to popup
+  if (message.type === 'warning' && message.text === 'Language is not English') {
+    console.log("Forwarding language detection warning:", message);
+    chrome.runtime.sendMessage(message);
+  } else if (message.type === 'debug' && message.text && message.text.includes('[Language Detection]')) {
+    console.log("Forwarding language detection log:", message);
+    chrome.runtime.sendMessage(message);
+  }
+  
   if (message.type === 'finalTranscript') {
     currentTranscript = message.text;
     sendDebugMessage('Received transcript update');
