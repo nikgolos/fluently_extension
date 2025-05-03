@@ -11,17 +11,6 @@ let meetingDetectionInterval = null;
 let meetingEndCheckInterval = null;
 let autoSaveInterval = null;
 let lastSavedLength = 0;
-// Language detection variables
-let isEnglishDetected = false;
-let languageCheckInterval = null;
-let languageCheckCount = 0;
-let speechSamples = [];
-const MIN_SPEECH_SAMPLES = 2;
-const LANGUAGE_CONFIDENCE_THRESHOLD = 0.75;
-const CONFIDENCE_THRESHOLD_INCREMENT = 0.05;
-let currentConfidenceThreshold = LANGUAGE_CONFIDENCE_THRESHOLD;
-let speechStartDetectionTime = null;
-let isBackgroundVerifying = false;
 let vadEnergyThreshold = 0.01;
 let lastEnergyLevel = 0;
 let energySamples = [];
@@ -239,6 +228,7 @@ function saveTranscriptOnMeetingEnd() {
 
 // Initialize and auto-start on Google Meet
 function initialize() {
+  
   if (isGoogleMeetPage()) {
     console.log("Google Meet page detected, starting monitoring...");
     startMeetingDetection();
@@ -494,10 +484,6 @@ function startRecording() {
     hasReportedFinalTranscript = false;
     lastTranscript = '';
     lastSavedLength = 0;
-    isEnglishDetected = false;
-    languageCheckCount = 0;
-    speechSamples = [];
-    speechStartDetectionTime = null;
     
     // Generate a new session ID for this recording
     sessionId = generateSessionId();
@@ -523,7 +509,7 @@ function startRecording() {
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
-    recognition.maxAlternatives = 3; // Increase alternatives for better language detection
+    recognition.maxAlternatives = 3;
 
     // Set up enhanced audio processing to better transcribe all speakers on the call
     setupEnhancedAudioProcessing().then(() => {
@@ -534,21 +520,8 @@ function startRecording() {
         updateRecordingStatus();
         chrome.runtime.sendMessage({
           type: 'debug',
-          text: 'Recording started - Waiting for English speech'
+          text: 'Recording started'
         });
-        
-        // Set up language check interval if needed
-        if (!languageCheckInterval) {
-          languageCheckInterval = setInterval(() => {
-            if (!isEnglishDetected) {
-              languageCheckCount++;
-              console.log(`Language check ${languageCheckCount}: Waiting for English speech...`);
-            } else {
-              clearInterval(languageCheckInterval);
-              languageCheckInterval = null;
-            }
-          }, 2000);
-        }
       };
 
       recognition.onresult = (event) => {
@@ -558,163 +531,53 @@ function startRecording() {
         let finalTranscript = '';
         let interimTranscript = '';
         
-        // Check language when not yet detected
-        if (!isEnglishDetected) {
-          // Start timing speech detection if not already started
-          if (speechStartDetectionTime === null) {
-            speechStartDetectionTime = new Date();
-            console.log("Started speech detection timing");
-          }
-          
-          // Gather speech samples for better detection
-          let currentSpeechSample = '';
-          let confidenceScores = [];
-          
-          // Collect all text from this recognition event
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const transcript = event.results[i][0].transcript;
-            currentSpeechSample += transcript + ' ';
-            confidenceScores.push(event.results[i][0].confidence);
-          }
-          
-          // Check for common meeting phrases for faster detection
-          if (detectCommonMeetingPhrases(currentSpeechSample.trim())) {
-            console.log("Common meeting phrase detected, confirming English immediately");
-            isEnglishDetected = true;
-            
-            // Clean up the language check interval
-            if (languageCheckInterval) {
-              clearInterval(languageCheckInterval);
-              languageCheckInterval = null;
-            }
-            
-            updateRecordingStatus();
-            chrome.runtime.sendMessage({
-              type: 'debug',
-              text: 'English confirmed via common phrase - Starting transcription'
-            });
-            
-            // Process this transcript
-            finalTranscript = currentSpeechSample;
-            
-            // Continue with normal processing
-          }
-          
-          // Only process if we have meaningful content
-          if (currentSpeechSample.trim().length > 5) {
-            // Add to our speech samples
-            speechSamples.push({
-              text: currentSpeechSample,
-              confidence: Math.max(...confidenceScores)
-            });
-            
-            // Check if we've been detecting for at least 2 seconds and have enough samples
-            const speechDetectionTimePassed = new Date() - speechStartDetectionTime;
-            console.log(`Speech detection time: ${speechDetectionTimePassed}ms`);
-            
-            // Only make a determination after we have collected enough samples and 2 seconds have passed
-            if (speechSamples.length >= MIN_SPEECH_SAMPLES && speechDetectionTimePassed >= 2000) {
-              // Get average confidence score
-              const avgConfidence = speechSamples.reduce((sum, sample) => sum + sample.confidence, 0) / speechSamples.length;
-              
-              console.log(`Language detection after ${speechDetectionTimePassed}ms: Confidence=${avgConfidence.toFixed(2)} vs Threshold=${currentConfidenceThreshold.toFixed(2)}`);
-              
-              if (avgConfidence >= currentConfidenceThreshold) {
-                console.log("English speech confirmed with confidence:", avgConfidence);
-                isEnglishDetected = true;
-                
-                // Clean up the language check interval
-                if (languageCheckInterval) {
-                  clearInterval(languageCheckInterval);
-                  languageCheckInterval = null;
-                }
-                
-                // Start background verification process to continue validating
-                startBackgroundVerification();
-                
-                updateRecordingStatus();
-                chrome.runtime.sendMessage({
-                  type: 'debug',
-                  text: 'English speech confirmed - Starting transcription'
-                });
-              } else {
-                console.log("Non-English speech detected or low confidence:", avgConfidence);
-                // Gradually increase threshold as we collect more samples
-                // Makes it more strict over time
-                currentConfidenceThreshold = Math.min(
-                  LANGUAGE_CONFIDENCE_THRESHOLD + (speechSamples.length * CONFIDENCE_THRESHOLD_INCREMENT), 
-                  0.9 // Maximum threshold
-                );
-                
-                // Reset samples but keep collecting
-                if (speechSamples.length > 5) {
-                  speechSamples = speechSamples.slice(-3);
-                }
-                
-                // Only process results if English is detected
-                return;
-              }
-            } else if (speechSamples.length >= 10) {
-              // If we have too many samples but not enough confidence, reset collection
-              speechSamples = speechSamples.slice(-5);
-            } else {
-              // Not enough samples or time yet
-              console.log(`Collecting speech samples: ${speechSamples.length}/${MIN_SPEECH_SAMPLES}, Time: ${speechDetectionTimePassed}ms/2000ms`);
-              return;
-            }
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
           }
         }
 
-        // Only process transcript if English is detected
-        if (isEnglishDetected) {
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const transcript = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-              finalTranscript += transcript;
-            } else {
-              interimTranscript += transcript;
-            }
+        // Process final transcript
+        if (finalTranscript) {
+          const now = new Date();
+          const endTimeSinceStart = ((now - startTime) / 1000).toFixed(1);
+          
+          // Use the recorded speech start time if available, otherwise estimate it
+          let startTimeSinceStart;
+          if (recognition.speechStartTime) {
+            startTimeSinceStart = ((recognition.speechStartTime - startTime) / 1000).toFixed(1);
+          } else {
+            // Fallback: estimate based on transcript length
+            const approximateDurationInSeconds = finalTranscript.length / 5;
+            startTimeSinceStart = Math.max(0, (endTimeSinceStart - approximateDurationInSeconds).toFixed(1));
           }
-
-          // Process final transcript
-          if (finalTranscript) {
-            const now = new Date();
-            const endTimeSinceStart = ((now - startTime) / 1000).toFixed(1);
-            
-            // Use the recorded speech start time if available, otherwise estimate it
-            let startTimeSinceStart;
-            if (recognition.speechStartTime) {
-              startTimeSinceStart = ((recognition.speechStartTime - startTime) / 1000).toFixed(1);
-            } else {
-              // Fallback: estimate based on transcript length
-              const approximateDurationInSeconds = finalTranscript.length / 5;
-              startTimeSinceStart = Math.max(0, (endTimeSinceStart - approximateDurationInSeconds).toFixed(1));
-            }
-            
-            // Format with start and end timecodes - using same format as main handler
-            const formattedTranscript = `[S:${startTimeSinceStart}s] ${finalTranscript} [E:${endTimeSinceStart}s]`;
-            
-            lastTranscript = lastTranscript + ' ' + formattedTranscript;
-            chrome.runtime.sendMessage({
-              type: 'transcriptUpdate',
-              sessionId: sessionId,
-              text: lastTranscript,
-              isFinal: true
-            });
-            
-            // Reset speech start time for the next segment
-            recognition.speechStartTime = null;
-            
-            // Save on significant transcript updates
-            saveTranscriptSegment();
-          } else if (interimTranscript) {
-            chrome.runtime.sendMessage({
-              type: 'transcriptUpdate',
-              sessionId: sessionId,
-              text: interimTranscript,
-              isFinal: false
-            });
-          }
+          
+          // Format with start and end timecodes - using same format as main handler
+          const formattedTranscript = `[S:${startTimeSinceStart}s] ${finalTranscript} [E:${endTimeSinceStart}s]`;
+          
+          lastTranscript = lastTranscript + ' ' + formattedTranscript;
+          chrome.runtime.sendMessage({
+            type: 'transcriptUpdate',
+            sessionId: sessionId,
+            text: lastTranscript,
+            isFinal: true
+          });
+          
+          // Reset speech start time for the next segment
+          recognition.speechStartTime = null;
+          
+          // Save on significant transcript updates
+          saveTranscriptSegment();
+        } else if (interimTranscript) {
+          chrome.runtime.sendMessage({
+            type: 'transcriptUpdate',
+            sessionId: sessionId,
+            text: interimTranscript,
+            isFinal: false
+          });
         }
       };
 
@@ -844,15 +707,6 @@ function stopRecording() {
   // Reset recording state
   isRecording = false;
   
-  // Clear language detection state
-  isEnglishDetected = false;
-  speechSamples = [];
-  speechStartDetectionTime = null;
-  if (languageCheckInterval) {
-    clearInterval(languageCheckInterval);
-    languageCheckInterval = null;
-  }
-  
   // Stop auto-save
   stopAutoSave();
   
@@ -887,40 +741,7 @@ function updateRecordingStatus() {
     isRecording: isRecording
   });
   
-  // Create or update visual indicator for language detection status
-  let statusElement = document.getElementById('fluentlyStatusIndicator');
-  
-  if (!statusElement) {
-    statusElement = document.createElement('div');
-    statusElement.id = 'fluentlyStatusIndicator';
-    statusElement.style.position = 'fixed';
-    statusElement.style.bottom = '20px';
-    statusElement.style.right = '20px';
-    statusElement.style.padding = '8px 15px';
-    statusElement.style.borderRadius = '5px';
-    statusElement.style.zIndex = '9999';
-    statusElement.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
-    statusElement.style.fontSize = '14px';
-    statusElement.style.fontWeight = 'bold';
-    document.body.appendChild(statusElement);
-  }
-  
-  if (isRecording) {
-    if (isEnglishDetected) {
-      statusElement.innerHTML = '🟢 Recording (English detected)';
-      statusElement.style.backgroundColor = '#d4edda';
-      statusElement.style.color = '#155724';
-      statusElement.style.border = '1px solid #c3e6cb';
-    } else {
-      statusElement.innerHTML = '🟠 Waiting for English speech...';
-      statusElement.style.backgroundColor = '#fff3cd';
-      statusElement.style.color = '#856404';
-      statusElement.style.border = '1px solid #ffeeba';
-    }
-    statusElement.style.display = 'block';
-  } else {
-    statusElement.style.display = 'none';
-  }
+  // Visual indicator removed as requested
 }
 
 // Clean up on unload
@@ -1174,11 +995,6 @@ function logAudioStreamInfo(stream) {
 // Add this helper function to fall back to standard recognition if enhanced setup fails
 function startStandardRecognition() {
   try {
-    // Reset language detection state
-    isEnglishDetected = false;
-    speechSamples = [];
-    speechStartDetectionTime = null;
-    
     // Add custom property to track speech start time
     recognition.speechStartTime = null;
     
@@ -1190,21 +1006,8 @@ function startStandardRecognition() {
       updateRecordingStatus();
       chrome.runtime.sendMessage({
         type: 'debug',
-        text: 'Standard recording started - Waiting for English speech'
+        text: 'Standard recording started'
       });
-      
-      // Set up language check interval
-      if (!languageCheckInterval) {
-        languageCheckInterval = setInterval(() => {
-          if (!isEnglishDetected) {
-            languageCheckCount++;
-            console.log(`Language check ${languageCheckCount}: Waiting for English speech...`);
-          } else {
-            clearInterval(languageCheckInterval);
-            languageCheckInterval = null;
-          }
-        }, 2000);
-      }
     };
     
     // Add sound start/end handlers to track speech timing
@@ -1234,128 +1037,53 @@ function startStandardRecognition() {
       let finalTranscript = '';
       let interimTranscript = '';
       
-      // Check language when not yet detected
-      if (!isEnglishDetected) {
-        // Start timing speech detection if not already started
-        if (speechStartDetectionTime === null) {
-          speechStartDetectionTime = new Date();
-          console.log("Started speech detection timing");
-        }
-        
-        // Gather speech samples for better detection
-        let currentSpeechSample = '';
-        let confidenceScores = [];
-        
-        // Collect all text from this recognition event
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript;
-          currentSpeechSample += transcript + ' ';
-          confidenceScores.push(event.results[i][0].confidence);
-        }
-        
-        // Only process if we have meaningful content
-        if (currentSpeechSample.trim().length > 5) {
-          // Add to our speech samples
-          speechSamples.push({
-            text: currentSpeechSample,
-            confidence: Math.max(...confidenceScores)
-          });
-          
-          // Check if we've been detecting for at least 2 seconds and have enough samples
-          const speechDetectionTimePassed = new Date() - speechStartDetectionTime;
-          console.log(`Speech detection time: ${speechDetectionTimePassed}ms`);
-          
-          // Only make a determination after we have collected enough samples and 2 seconds have passed
-          if (speechSamples.length >= MIN_SPEECH_SAMPLES && speechDetectionTimePassed >= 2000) {
-            // Get average confidence score
-            const avgConfidence = speechSamples.reduce((sum, sample) => sum + sample.confidence, 0) / speechSamples.length;
-            
-            console.log(`Language detection after 2 seconds: Confidence=${avgConfidence.toFixed(2)}`);
-            
-            if (avgConfidence >= LANGUAGE_CONFIDENCE_THRESHOLD) {
-              console.log("English speech confirmed with confidence:", avgConfidence);
-              isEnglishDetected = true;
-              
-              // Clean up the language check interval
-              if (languageCheckInterval) {
-                clearInterval(languageCheckInterval);
-                languageCheckInterval = null;
-              }
-              
-              updateRecordingStatus();
-              chrome.runtime.sendMessage({
-                type: 'debug',
-                text: 'English speech confirmed - Starting transcription'
-              });
-            } else {
-              console.log("Non-English speech detected, confidence:", avgConfidence);
-              // Reset samples and timer to keep collecting
-              speechSamples = [];
-              speechStartDetectionTime = new Date();
-              // Only process results if English is detected
-              return;
-            }
-          } else if (speechSamples.length >= 10) {
-            // If we have too many samples but not enough confidence, reset collection
-            speechSamples = speechSamples.slice(-5);
-          } else {
-            // Not enough samples or time yet
-            console.log(`Collecting speech samples: ${speechSamples.length}/${MIN_SPEECH_SAMPLES}, Time: ${speechDetectionTimePassed}ms/2000ms`);
-            return;
-          }
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
         }
       }
-      
-      // Only process transcript if English is detected
-      if (isEnglishDetected) {
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            finalTranscript += transcript;
-          } else {
-            interimTranscript += transcript;
-          }
-        }
 
-        // Process final transcript
-        if (finalTranscript) {
-          const now = new Date();
-          const endTimeSinceStart = ((now - startTime) / 1000).toFixed(1);
-          
-          // Use the recorded speech start time if available, otherwise estimate it
-          let startTimeSinceStart;
-          if (recognition.speechStartTime) {
-            startTimeSinceStart = ((recognition.speechStartTime - startTime) / 1000).toFixed(1);
-          } else {
-            // Fallback: estimate based on transcript length
-            const approximateDurationInSeconds = finalTranscript.length / 5;
-            startTimeSinceStart = Math.max(0, (endTimeSinceStart - approximateDurationInSeconds).toFixed(1));
-          }
-          
-          // Format with start and end timecodes - using same format as main handler
-          const formattedTranscript = `[S:${startTimeSinceStart}s] ${finalTranscript} [E:${endTimeSinceStart}s]`;
-          
-          lastTranscript = lastTranscript + ' ' + formattedTranscript;
-          chrome.runtime.sendMessage({
-            type: 'transcriptUpdate',
-            sessionId: sessionId,
-            text: lastTranscript,
-            isFinal: true
-          });
-          
-          // Reset speech start time for the next segment
-          recognition.speechStartTime = null;
-          
-          // Save on significant transcript updates
-          saveTranscriptSegment();
-        } else if (interimTranscript) {
-          chrome.runtime.sendMessage({
-            type: 'transcriptUpdate',
-            sessionId: sessionId,
-            text: interimTranscript,
-            isFinal: false
-          });
+      // Process final transcript
+      if (finalTranscript) {
+        const now = new Date();
+        const endTimeSinceStart = ((now - startTime) / 1000).toFixed(1);
+        
+        // Use the recorded speech start time if available, otherwise estimate it
+        let startTimeSinceStart;
+        if (recognition.speechStartTime) {
+          startTimeSinceStart = ((recognition.speechStartTime - startTime) / 1000).toFixed(1);
+        } else {
+          // Fallback: estimate based on transcript length
+          const approximateDurationInSeconds = finalTranscript.length / 5;
+          startTimeSinceStart = Math.max(0, (endTimeSinceStart - approximateDurationInSeconds).toFixed(1));
         }
+        
+        // Format with start and end timecodes - using same format as main handler
+        const formattedTranscript = `[S:${startTimeSinceStart}s] ${finalTranscript} [E:${endTimeSinceStart}s]`;
+        
+        lastTranscript = lastTranscript + ' ' + formattedTranscript;
+        chrome.runtime.sendMessage({
+          type: 'transcriptUpdate',
+          sessionId: sessionId,
+          text: lastTranscript,
+          isFinal: true
+        });
+        
+        // Reset speech start time for the next segment
+        recognition.speechStartTime = null;
+        
+        // Save on significant transcript updates
+        saveTranscriptSegment();
+      } else if (interimTranscript) {
+        chrome.runtime.sendMessage({
+          type: 'transcriptUpdate',
+          sessionId: sessionId,
+          text: interimTranscript,
+          isFinal: false
+        });
       }
     };
     
@@ -1398,56 +1126,5 @@ function detectVoiceActivity(audioData) {
   
   // Return true if energy is above threshold (voice detected)
   return energy > vadEnergyThreshold;
-}
-
-// New function to check for common meeting phrases
-function detectCommonMeetingPhrases(text) {
-  if (!text) return false;
-  
-  const normalizedText = text.toLowerCase().trim();
-  
-  // Common English meeting starter phrases
-  const commonPhrases = [
-    "can everyone hear me", 
-    "let's get started",
-    "can you hear me",
-    "is my audio working",
-    "i'll start the meeting",
-    "welcome everyone",
-    "we're recording",
-    "thanks for joining",
-    "good morning",
-    "good afternoon",
-    "let me share my screen",
-    "shall we begin",
-    "let's begin"
-  ];
-  
-  // Check if the text contains any common phrases
-  return commonPhrases.some(phrase => normalizedText.includes(phrase));
-}
-
-// Add this new function for background verification
-function startBackgroundVerification() {
-  if (isBackgroundVerifying) return;
-  
-  isBackgroundVerifying = true;
-  console.log("Starting background verification process");
-  
-  // Reset samples but keep verifying confidence
-  speechSamples = speechSamples.slice(-2);
-  
-  // We'll continue collecting samples in the recognition.onresult handler
-  // but with a higher threshold to catch false positives
-  currentConfidenceThreshold = 0.85;
-  
-  // This doesn't need any additional code since the onresult handler
-  // will continue to receive and process speech even after detection
-  
-  // Log verification status
-  chrome.runtime.sendMessage({
-    type: 'debug',
-    text: 'Background verification active: Monitoring speech quality'
-  });
 }
 
