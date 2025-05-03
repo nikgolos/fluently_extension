@@ -16,9 +16,16 @@ let isEnglishDetected = false;
 let languageCheckInterval = null;
 let languageCheckCount = 0;
 let speechSamples = [];
-const MIN_SPEECH_SAMPLES = 3;
-const LANGUAGE_CONFIDENCE_THRESHOLD = 0.85; // Lower threshold to 0.8
+const MIN_SPEECH_SAMPLES = 2;
+const LANGUAGE_CONFIDENCE_THRESHOLD = 0.75;
+const CONFIDENCE_THRESHOLD_INCREMENT = 0.05;
+let currentConfidenceThreshold = LANGUAGE_CONFIDENCE_THRESHOLD;
 let speechStartDetectionTime = null;
+let isBackgroundVerifying = false;
+let vadEnergyThreshold = 0.01;
+let lastEnergyLevel = 0;
+let energySamples = [];
+const ENERGY_SAMPLE_COUNT = 10;
 
 // Function to generate a unique session ID
 function generateSessionId() {
@@ -570,6 +577,29 @@ function startRecording() {
             confidenceScores.push(event.results[i][0].confidence);
           }
           
+          // Check for common meeting phrases for faster detection
+          if (detectCommonMeetingPhrases(currentSpeechSample.trim())) {
+            console.log("Common meeting phrase detected, confirming English immediately");
+            isEnglishDetected = true;
+            
+            // Clean up the language check interval
+            if (languageCheckInterval) {
+              clearInterval(languageCheckInterval);
+              languageCheckInterval = null;
+            }
+            
+            updateRecordingStatus();
+            chrome.runtime.sendMessage({
+              type: 'debug',
+              text: 'English confirmed via common phrase - Starting transcription'
+            });
+            
+            // Process this transcript
+            finalTranscript = currentSpeechSample;
+            
+            // Continue with normal processing
+          }
+          
           // Only process if we have meaningful content
           if (currentSpeechSample.trim().length > 5) {
             // Add to our speech samples
@@ -587,9 +617,9 @@ function startRecording() {
               // Get average confidence score
               const avgConfidence = speechSamples.reduce((sum, sample) => sum + sample.confidence, 0) / speechSamples.length;
               
-              console.log(`Language detection after 2 seconds: Confidence=${avgConfidence.toFixed(2)}`);
+              console.log(`Language detection after ${speechDetectionTimePassed}ms: Confidence=${avgConfidence.toFixed(2)} vs Threshold=${currentConfidenceThreshold.toFixed(2)}`);
               
-              if (avgConfidence >= LANGUAGE_CONFIDENCE_THRESHOLD) {
+              if (avgConfidence >= currentConfidenceThreshold) {
                 console.log("English speech confirmed with confidence:", avgConfidence);
                 isEnglishDetected = true;
                 
@@ -599,16 +629,28 @@ function startRecording() {
                   languageCheckInterval = null;
                 }
                 
+                // Start background verification process to continue validating
+                startBackgroundVerification();
+                
                 updateRecordingStatus();
                 chrome.runtime.sendMessage({
                   type: 'debug',
                   text: 'English speech confirmed - Starting transcription'
                 });
               } else {
-                console.log("Non-English speech detected, confidence:", avgConfidence);
-                // Reset samples and timer to keep collecting
-                speechSamples = [];
-                speechStartDetectionTime = new Date();
+                console.log("Non-English speech detected or low confidence:", avgConfidence);
+                // Gradually increase threshold as we collect more samples
+                // Makes it more strict over time
+                currentConfidenceThreshold = Math.min(
+                  LANGUAGE_CONFIDENCE_THRESHOLD + (speechSamples.length * CONFIDENCE_THRESHOLD_INCREMENT), 
+                  0.9 // Maximum threshold
+                );
+                
+                // Reset samples but keep collecting
+                if (speechSamples.length > 5) {
+                  speechSamples = speechSamples.slice(-3);
+                }
+                
                 // Only process results if English is detected
                 return;
               }
@@ -944,16 +986,23 @@ async function setupEnhancedAudioProcessing() {
         // Try to minimize latency for real-time transcription
         latency: 0,
         
-        // Higher gain setting to better pick up remote speakers
-        // This may be supported on some browsers/devices
-        gain: 1.0,
+        // Higher sample rate for better clarity
+        sampleRate: 48000,
         
         // Attempt to use dual-channel mode if available
         // This can help with spatial separation of speakers
         channelCount: 2,
         
         // Some browsers allow setting mic gain programmatically
-        volume: 1.0
+        volume: 1.0,
+        
+        // Specify audio processing to optimize for voice
+        googEchoCancellation: true,
+        googAutoGainControl: true,
+        googNoiseSuppression: true,
+        googHighpassFilter: true,
+        googTypingNoiseDetection: true,
+        googAudioMirroring: false
       }]
     };
 
@@ -964,6 +1013,36 @@ async function setupEnhancedAudioProcessing() {
     
     // Log detailed information about the audio configuration
     logAudioStreamInfo(stream);
+    
+    // Create an audio context for potential VAD processing
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const source = audioContext.createMediaStreamSource(stream);
+    
+    // Create a processor node for Voice Activity Detection
+    if (audioContext.createScriptProcessor) {
+      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      
+      processor.onaudioprocess = (e) => {
+        const input = e.inputBuffer.getChannelData(0);
+        
+        // Check for voice activity
+        const hasVoice = detectVoiceActivity(input);
+        
+        // If speech recognition is active, use this information
+        if (recognition && hasVoice && !recognition.speechStartTime) {
+          console.log("VAD: Voice activity detected");
+          recognition.speechStartTime = new Date();
+        }
+      };
+      
+      // Connect the nodes
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+      
+      // Store for cleanup
+      window.vadProcessor = processor;
+      window.vadAudioContext = audioContext;
+    }
     
     // Try to apply the enhanced audio configuration directly to the SpeechRecognition object
     // This is browser-dependent but helps when available
@@ -1290,5 +1369,85 @@ function startStandardRecognition() {
       error: error.message
     });
   }
+}
+
+// New helper function to detect voice activity
+function detectVoiceActivity(audioData) {
+  if (!audioData || audioData.length === 0) return false;
+  
+  // Simple energy-based voice detection
+  let energy = 0;
+  
+  // Calculate energy from audio samples
+  for (let i = 0; i < audioData.length; i++) {
+    energy += Math.abs(audioData[i]);
+  }
+  
+  energy = energy / audioData.length;
+  lastEnergyLevel = energy;
+  
+  // Collect energy samples for adaptive threshold
+  energySamples.push(energy);
+  if (energySamples.length > ENERGY_SAMPLE_COUNT) {
+    energySamples.shift();
+    
+    // Adapt threshold based on recent energy levels
+    const avgEnergy = energySamples.reduce((sum, val) => sum + val, 0) / energySamples.length;
+    vadEnergyThreshold = avgEnergy * 1.2; // Set threshold slightly above average
+  }
+  
+  // Return true if energy is above threshold (voice detected)
+  return energy > vadEnergyThreshold;
+}
+
+// New function to check for common meeting phrases
+function detectCommonMeetingPhrases(text) {
+  if (!text) return false;
+  
+  const normalizedText = text.toLowerCase().trim();
+  
+  // Common English meeting starter phrases
+  const commonPhrases = [
+    "can everyone hear me", 
+    "let's get started",
+    "can you hear me",
+    "is my audio working",
+    "i'll start the meeting",
+    "welcome everyone",
+    "we're recording",
+    "thanks for joining",
+    "good morning",
+    "good afternoon",
+    "let me share my screen",
+    "shall we begin",
+    "let's begin"
+  ];
+  
+  // Check if the text contains any common phrases
+  return commonPhrases.some(phrase => normalizedText.includes(phrase));
+}
+
+// Add this new function for background verification
+function startBackgroundVerification() {
+  if (isBackgroundVerifying) return;
+  
+  isBackgroundVerifying = true;
+  console.log("Starting background verification process");
+  
+  // Reset samples but keep verifying confidence
+  speechSamples = speechSamples.slice(-2);
+  
+  // We'll continue collecting samples in the recognition.onresult handler
+  // but with a higher threshold to catch false positives
+  currentConfidenceThreshold = 0.85;
+  
+  // This doesn't need any additional code since the onresult handler
+  // will continue to receive and process speech even after detection
+  
+  // Log verification status
+  chrome.runtime.sendMessage({
+    type: 'debug',
+    text: 'Background verification active: Monitoring speech quality'
+  });
 }
 
