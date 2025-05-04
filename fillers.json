@@ -1,0 +1,46 @@
+{
+    "fillerWords": {
+      "uhh": [
+        "um", "umm", "uh", "uhh", "er", "err", "ah", "ahh", "hmm", "hmmm", "huh",
+        "mmm", "mmhmm", "eh", "ehh", "erm", "em", "oh", "ohh", "ahem", "oof",
+        "phew", "whew", "pff", "pfft", "tsk", "tut", "sheesh", "yikes", "wow",
+        "woah", "whoa", "ooh", "ugh", "urgh", "argh", "grr", "eek", "yikes",
+        "meh", "huh", "huhh", "hm", "hmph", "hmpf", "psst", "shh", "oof", "yawn", "uh-huh", "mhm", "mm-hmm", "wo", "mm"
+      ],
+      "okey": [
+        "ok", "okay", "okey", "okie", "okies", "okidoki", "okidokie", "k", "kk"
+      ],
+      "yes": [
+        "yep", "yeah", "yes", "yup"
+      ],
+      "right": [
+        "alright", "alrighty", "right", "righto"
+      ],
+      "others": [
+        "fine", "gotcha", "got it", "indeed",
+        "exactly", "precisely", "correct", "agreed",
+        "absolutely", "totally", "completely", "definitely", "certainly", "sure", "like", "you know", "guess", "sort of", "kind of", "kinda",
+        "sorta", "basically", "literally", "actually", "honestly", "frankly", "mean", "if you will",
+        "sense", "so", "well", "anyway", "anyhow", "anyways",
+        "however", "therefore", "thus", "hence", "consequently", "nevertheless", 
+        "nonetheless", "still", "yet", "anyway",
+        "think", "believe", "feel", "suppose", "look", "listen", "see", "now", "okay so", "so basically",
+        "probably", "possibly", "perhaps", "maybe", "might", "may",
+        "somewhat", "somehow", "occasionally", "sometimes", "generally", "usually",
+        "often", "typically", "more or less", "approximately", "roughly", "around",
+        "very", "really", "so", "totally", "absolutely", "completely", "extremely",
+        "incredibly", "super", "quite", "rather", "pretty", "fairly", "somewhat",
+        "just", "only", "simply", "merely", "first", "second", "third", "lastly", 
+        "finally", "next", "then", "after that", "subsequently", "consequently", 
+        "result", "meanwhile", "meantime", "by the way", "incidentally", "makes sense",
+        "gonna", "wanna", "gotta", "dunno", "innit", "y'all", "whatevs", "whatever",
+        "anyway", "anyhoo", "welp", "sooo", "soooo"
+      ]
+    },
+    "metadata": {
+      "version": "1.0.0",
+      "description": "Simplified dictionary of filler words and sounds for analyzing speech transcripts",
+      "lastUpdated": "2025-05-04",
+      "categories": 5
+    }
+}
