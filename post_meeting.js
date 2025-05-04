@@ -5,6 +5,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const speakingTimeElement = document.getElementById('speakingTime');
   const totalWordsElement = document.getElementById('totalWords');
   const wpmElement = document.getElementById('wpm');
+  const garbageWordsElement = document.getElementById('garbageWords');
+  const garbageWordsListElement = document.getElementById('garbageWordsList');
+  const garbagePercentageElement = document.getElementById('garbagePercentage');
   const shareButton = document.getElementById('shareButton');
   const returnButton = document.getElementById('returnButton');
   
@@ -75,26 +78,65 @@ document.addEventListener('DOMContentLoaded', () => {
       
       console.log("Stats for transcript:", stats);
       
-      // If we still have no stats and the transcript has text, calculate them on the fly
-      if (Object.keys(stats).length === 0 && transcript.text) {
-        console.log("No stats found, calculating on the fly");
-        
-        // Check if TranscriptStats is loaded
-        if (typeof window.TranscriptStats !== 'undefined') {
-          stats = window.TranscriptStats.calculateTranscriptStats(transcript);
-          console.log("Calculated stats on the fly:", stats);
+      // If TranscriptStats is loaded, we'll always calculate (or recalculate) garbage word stats
+      if (typeof window.TranscriptStats !== 'undefined') {
+        // If we already have some stats but need to calculate/recalculate garbage words
+        if (Object.keys(stats).length > 0 && (!stats.garbage_words || Object.keys(stats.garbage_words).length === 0)) {
+          console.log("Calculating garbage word stats for existing transcript stats");
           
-          // Store these stats for future use
-          saveCalculatedStats(stats, transcript.id);
-        } else {
-          console.warn("TranscriptStats module not loaded, calculating basic stats");
-          stats = calculateBasicStats(transcript);
-          console.log("Basic calculated stats:", stats);
+          // Keep existing stats and add garbage words
+          window.TranscriptStats.calculateGarbageWordStats(transcript.text)
+            .then(garbageStats => {
+              stats.garbage_words = garbageStats;
+              
+              // Save updated stats
+              saveCalculatedStats(stats, transcript.id);
+              
+              // Display transcript info with updated stats
+              displayTranscriptInfo(transcript, stats);
+            })
+            .catch(error => {
+              console.error("Error calculating garbage word stats:", error);
+              
+              // Display with existing stats
+              displayTranscriptInfo(transcript, stats);
+            });
+        } 
+        // If we have no stats at all, calculate everything
+        else if (Object.keys(stats).length === 0 && transcript.text) {
+          console.log("No stats found, calculating all stats including garbage words");
+          
+          // Calculate all stats including garbage words
+          window.TranscriptStats.calculateTranscriptStats(transcript)
+            .then(calculatedStats => {
+              console.log("Calculated stats:", calculatedStats);
+              
+              // Store these stats for future use
+              saveCalculatedStats(calculatedStats, transcript.id);
+              
+              // Display transcript info
+              displayTranscriptInfo(transcript, calculatedStats);
+            })
+            .catch(error => {
+              console.error("Error calculating transcript stats:", error);
+              
+              // Fallback to basic stats
+              const basicStats = calculateBasicStats(transcript);
+              displayTranscriptInfo(transcript, basicStats);
+            });
         }
+        // Otherwise, use existing stats that already include garbage words
+        else {
+          displayTranscriptInfo(transcript, stats);
+        }
+      } else {
+        console.warn("TranscriptStats module not loaded, calculating basic stats");
+        stats = calculateBasicStats(transcript);
+        console.log("Basic calculated stats:", stats);
+        
+        // Display transcript info
+        displayTranscriptInfo(transcript, stats);
       }
-      
-      // Display transcript info
-      displayTranscriptInfo(transcript, stats);
       
       // Store transcript for sharing
       window.transcriptData = transcript;
@@ -123,7 +165,12 @@ document.addEventListener('DOMContentLoaded', () => {
         total_words: 0,
         words_per_minute: 0,
         meeting_length: '00h 00m 00s',
-        speaking_time: '00h 00m 00s'
+        speaking_time: '00h 00m 00s',
+        garbage_words: {
+          totalGarbageWords: 0,
+          topGarbageWords: {},
+          garbagePercentage: 0
+        }
       };
     }
     
@@ -148,6 +195,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // Estimate words per minute
     const wpm = Math.round(totalWords / (estimatedSpeakingTimeSeconds / 60));
     
+    // We can't calculate garbage words properly without the dictionary,
+    // so we'll provide a placeholder with zero values
+    const garbageWords = {
+      totalGarbageWords: 0,
+      topGarbageWords: {}
+    };
+    
     return {
       transcript_id: transcript.id,
       session_id: transcript.sessionId,
@@ -158,7 +212,8 @@ document.addEventListener('DOMContentLoaded', () => {
       speaking_time: speakingTime,
       speaking_time_seconds: estimatedSpeakingTimeSeconds,
       timestamp: new Date().toISOString(),
-      calculated_on_page: true
+      calculated_on_page: true,
+      garbage_words: garbageWords
     };
   }
   
@@ -205,11 +260,52 @@ document.addEventListener('DOMContentLoaded', () => {
       // Words per minute - check both naming conventions
       wpmElement.textContent = stats.words_per_minute || stats.wordsPerMinute || '0';
       
+      // Display garbage words stats if available
+      if (stats.garbage_words) {
+        garbageWordsElement.textContent = stats.garbage_words.totalGarbageWords || '0';
+        
+        // Display garbage words percentage
+        const percentage = stats.garbage_words.garbagePercentage || 0;
+        garbagePercentageElement.textContent = `(${percentage}%)`;
+        
+        // Display top garbage words if available
+        if (stats.garbage_words.topGarbageWords && Object.keys(stats.garbage_words.topGarbageWords).length > 0) {
+          garbageWordsListElement.innerHTML = '';
+          
+          // Create list items for each top garbage word
+          Object.entries(stats.garbage_words.topGarbageWords).forEach(([word, count]) => {
+            const wordItem = document.createElement('div');
+            wordItem.className = 'garbage-word-item';
+            
+            // Format the display based on category names
+            let displayText = '';
+            if (word === 'yes' || word === 'okey' || word === 'uhh' || word === 'right') {
+              // This is a category name - capitalize the first letter
+              displayText = `${word.charAt(0).toUpperCase() + word.slice(1)}: ${count}`;
+            } else {
+              // This is a regular word from the "others" category
+              displayText = `${word}: ${count}`;
+            }
+            
+            wordItem.textContent = displayText;
+            garbageWordsListElement.appendChild(wordItem);
+          });
+        } else {
+          garbageWordsListElement.innerHTML = '<div class="garbage-word-item">No frequent garbage words</div>';
+        }
+      } else {
+        garbageWordsElement.textContent = '0';
+        garbagePercentageElement.textContent = '(0%)';
+        garbageWordsListElement.innerHTML = '';
+      }
+      
       console.log("Displayed stats:", {
         meetingLength: meetingLengthElement.textContent,
         speakingTime: speakingTimeElement.textContent,
         totalWords: totalWordsElement.textContent,
-        wpm: wpmElement.textContent
+        wpm: wpmElement.textContent,
+        garbageWords: garbageWordsElement.textContent,
+        garbagePercentage: garbagePercentageElement.textContent
       });
     } else {
       console.warn("No stats found for transcript:", transcript.id);
@@ -217,6 +313,9 @@ document.addEventListener('DOMContentLoaded', () => {
       speakingTimeElement.textContent = '00h 00m 00s';
       totalWordsElement.textContent = '0';
       wpmElement.textContent = '0';
+      garbageWordsElement.textContent = '0';
+      garbagePercentageElement.textContent = '(0%)';
+      garbageWordsListElement.innerHTML = '';
     }
     
     // Add animation to stat cards
@@ -261,13 +360,27 @@ document.addEventListener('DOMContentLoaded', () => {
       const date = new Date(window.transcriptData.timestamp).toLocaleDateString();
       const time = new Date(window.transcriptData.timestamp).toLocaleTimeString();
       
+      // Get garbage words info for sharing if available
+      let garbageWordsText = '';
+      if (garbageWordsElement.textContent !== '0') {
+        garbageWordsText = `\nGarbage Words: ${garbageWordsElement.textContent} ${garbagePercentageElement.textContent}`;
+        
+        // Add individual garbage words if available
+        const garbageItems = garbageWordsListElement.querySelectorAll('.garbage-word-item');
+        if (garbageItems.length > 0) {
+          Array.from(garbageItems).forEach(item => {
+            garbageWordsText += `\n    ${item.textContent}`;
+          });
+        }
+      }
+      
       // Create share text with stats
       const shareText = `
 Meeting Stats from ${date} at ${time}
 Meeting Duration: ${meetingLengthElement.textContent}
 Speaking Time: ${speakingTimeElement.textContent}
 Total Words: ${totalWordsElement.textContent}
-Words Per Minute: ${wpmElement.textContent}
+Words Per Minute: ${wpmElement.textContent}${garbageWordsText}
 
 Shared from Fluently Meeting Transcriber
 `;

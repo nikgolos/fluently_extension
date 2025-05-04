@@ -195,10 +195,25 @@ function calculateTranscriptStats(transcript) {
   
   console.log("Final calculated stats:", stats);
   
-  // Store the stats
-  saveTranscriptStats(stats, transcript.id);
-  
-  return stats;
+  // Calculate garbage word stats
+  return calculateGarbageWordStats(fixedText)
+    .then(garbageStats => {
+      // Add garbage stats to the overall stats
+      stats.garbage_words = garbageStats;
+      
+      // Store the stats
+      saveTranscriptStats(stats, transcript.id);
+      
+      return stats;
+    })
+    .catch(error => {
+      console.error("Error calculating garbage word stats:", error);
+      
+      // Store the stats we have even if garbage stats failed
+      saveTranscriptStats(stats, transcript.id);
+      
+      return stats;
+    });
 }
 
 // Calculate Meeting Duration and speaking time from transcript
@@ -564,10 +579,121 @@ function getAllTranscriptStats(callback) {
   });
 }
 
+// Function to count garbage/filler words in a transcript
+function calculateGarbageWordStats(text) {
+  // First, clean the text by removing timestamps
+  const timestampRegex = /\[\s*[SE]:\s*\d+(?:\.\d+)?s\s*\]/g;
+  const cleanedText = text.replace(timestampRegex, ' ');
+  
+  // Second cleaning pass to ensure no brackets remain and normalize spaces
+  const cleanText = cleanedText.replace(/\[[^\]]*\]/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  
+  // Get total word count for percentage calculation
+  const totalWords = cleanText.split(' ').filter(word => word.length > 0).length;
+  
+  // Load the filler words dictionary
+  return new Promise((resolve, reject) => {
+    fetch(chrome.runtime.getURL('fillers.json'))
+      .then(response => response.json())
+      .then(data => {
+        const fillerDict = data.fillerWords;
+        
+        // Track all garbage words and their counts
+        const garbageWordsCount = {
+          total: 0,
+          byCategory: {},
+          uniqueGarbage: {}
+        };
+        
+        // Initialize count for each category
+        for (const category in fillerDict) {
+          garbageWordsCount.byCategory[category] = 0;
+        }
+        
+        // Split text into words
+        const words = cleanText.split(' ').filter(word => word.length > 0);
+        
+        // Check each word against the filler dictionary
+        for (const word of words) {
+          // Clean the word of punctuation
+          const cleanWord = word.replace(/[.,!?;:()"'-]/g, '');
+          if (cleanWord.length === 0) continue;
+          
+          // Check each category for matches
+          for (const category in fillerDict) {
+            if (fillerDict[category].includes(cleanWord)) {
+              garbageWordsCount.total++;
+              garbageWordsCount.byCategory[category]++;
+              
+              // For "others" category, track individual word counts
+              if (category === 'others') {
+                if (!garbageWordsCount.uniqueGarbage[cleanWord]) {
+                  garbageWordsCount.uniqueGarbage[cleanWord] = 0;
+                }
+                garbageWordsCount.uniqueGarbage[cleanWord]++;
+              }
+              
+              break; // Once found in a category, no need to check others
+            }
+          }
+        }
+        
+        // Convert category totals to the display format
+        const topGarbageWords = {};
+        
+        // Add category totals that meet the threshold (3 or more)
+        for (const category in garbageWordsCount.byCategory) {
+          const count = garbageWordsCount.byCategory[category];
+          if (count >= 3 && category !== 'others') {
+            topGarbageWords[category] = count;
+          }
+        }
+        
+        // Add individual words from 'others' category that meet the threshold
+        const othersWordsArray = Object.entries(garbageWordsCount.uniqueGarbage)
+          .filter(([word, count]) => count >= 3) // Only include words with frequency >= 3
+          .sort((a, b) => b[1] - a[1]); // Sort by count (descending)
+        
+        // Take the top 3 words from 'others' category
+        const topOthersWords = othersWordsArray.slice(0, 3);
+        
+        // Add top 'others' words to the result
+        topOthersWords.forEach(([word, count]) => {
+          topGarbageWords[word] = count;
+        });
+        
+        // Calculate percentage of garbage words from total words
+        const garbagePercentage = totalWords > 0 ? 
+          Math.round((garbageWordsCount.total / totalWords) * 100) : 0;
+        
+        const result = {
+          totalGarbageWords: garbageWordsCount.total,
+          garbageWordsByCategory: garbageWordsCount.byCategory,
+          topGarbageWords: topGarbageWords,
+          garbagePercentage: garbagePercentage
+        };
+        
+        console.log("Garbage word stats:", result);
+        resolve(result);
+      })
+      .catch(error => {
+        console.error("Error loading or processing filler words:", error);
+        // Return empty stats if there's an error
+        resolve({
+          totalGarbageWords: 0,
+          garbageWordsByCategory: {},
+          topGarbageWords: {},
+          garbagePercentage: 0
+        });
+      });
+  });
+}
+
 // Export functions
 window.TranscriptStats = {
   calculateTranscriptStats,
   getTranscriptStats,
   getAllTranscriptStats,
-  fixTranscriptTimestamps
+  fixTranscriptTimestamps,
+  calculateGarbageWordStats
 }; 

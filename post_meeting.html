@@ -150,6 +150,21 @@
     .icon-speed {
       color: #1a73e8;
     }
+    
+    .icon-garbage {
+      color: #1a73e8;
+    }
+    
+    .garbage-words-list {
+      margin-top: 8px;
+      font-size: 14px;
+      color: #5f6368;
+      text-align: center;
+    }
+    
+    .garbage-word-item {
+      margin: 4px 0;
+    }
   </style>
 </head>
 <body>
@@ -195,6 +210,16 @@
         </div>
         <div class="stat-value" id="wpm">0</div>
         <div class="stat-title">Words Per Minute</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon icon-garbage">
+          <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 0 24 24" width="24" fill="currentColor">
+            <path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7z"/>
+          </svg>
+        </div>
+        <div class="stat-value" id="garbageWords">0</div>
+        <div class="stat-title">Garbage Words <span id="garbagePercentage">(0%)</span></div>
+        <div class="garbage-words-list" id="garbageWordsList"></div>
       </div>
     </div>
     
