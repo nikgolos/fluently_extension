@@ -77,15 +77,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   
   if (message.type === 'finalTranscript') {
+    // Check if the session is marked as non-English
+    if (message.isEnglish === false) {
+      console.log("Not saving transcript because session is marked as non-English");
+      return;
+    }
+    
     currentTranscript = message.text;
     sendDebugMessage('Received transcript update');
     
     // Only save when recording is explicitly stopped
     if (isRecordingStopped) {
-      saveTranscriptToStorage(currentTranscript, sender, message.sessionId);
+      saveTranscriptToStorage(currentTranscript, sender, message.sessionId, message.meetingCode, message.isEnglish);
       isRecordingStopped = false; // Reset flag after saving
     }
   } else if (message.type === 'meetingEnded') {
+    // Check if the session is marked as non-English
+    if (message.isEnglish === false) {
+      console.log("Not saving transcript because session is marked as non-English");
+      return;
+    }
+    
     // This is a dedicated message for when a meeting ends, save immediately
     // Check if we've already processed this session to avoid duplicates
     if (sessionIdProcessed === message.sessionId) {
@@ -95,12 +107,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     
     console.log("Meeting ended message received, saving transcript immediately");
     currentTranscript = message.text;
-    saveTranscriptToStorage(currentTranscript, sender, message.sessionId);
+    saveTranscriptToStorage(currentTranscript, sender, message.sessionId, message.meetingCode, message.isEnglish);
   } else if (message.type === 'error') {
     sendDebugMessage('Error: ' + message.error);
   } else if (message.type === 'recordingStatus') {
     // If recording was turned off, save the transcript
     if (message.isRecording === false && currentTranscript) {
+      // Check if the session is marked as non-English
+      if (message.isEnglish === false) {
+        console.log("Not saving transcript because session is marked as non-English");
+        return;
+      }
+      
       isRecordingStopped = true;
       sendDebugMessage('Recording stopped, preparing to save transcript');
     }
@@ -112,7 +130,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     
     sendDebugMessage('Meeting ended detected via debug message, saving transcript');
-    saveTranscriptToStorage(currentTranscript, sender, currentSessionId);
+    saveTranscriptToStorage(currentTranscript, sender, currentSessionId, message.meetingCode, message.isEnglish);
   } else if (message.type === 'openTranscriptsPage') {
     openTranscriptsPage();
   }
@@ -164,6 +182,12 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 function saveUnfinishedSession(segment) {
   if (!segment || !segment.text) return;
   
+  // Skip if this session is marked as non-English
+  if (segment.isEnglish === false) {
+    console.log('Not saving unfinished transcript because session is marked as non-English');
+    return;
+  }
+  
   // Mark as complete
   segment.isComplete = true;
   
@@ -174,7 +198,7 @@ function saveUnfinishedSession(segment) {
   }, () => {
     console.log('Unfinished transcript marked as complete');
     // Also create a permanent copy in the transcripts array
-    saveTranscriptToStorage(segment.text, null, segment.sessionId, segment.meetingCode);
+    saveTranscriptToStorage(segment.text, null, segment.sessionId, segment.meetingCode, segment.isEnglish);
   });
 }
 
@@ -285,7 +309,14 @@ function fixOverlappingTimestamps(text) {
   return cleanedText;
 }
 
-function saveTranscriptToStorage(text, sender, sessionId, meetingCode) {
+function saveTranscriptToStorage(text, sender, sessionId, meetingCode, isEnglish) {
+  // First, strictly check the isEnglish flag - if not explicitly true, don't save anything
+  if (isEnglish !== true) {
+    console.log('Not saving transcript because isEnglish flag is not explicitly true:', isEnglish);
+    sendDebugMessage('Transcript not saved: not confirmed as English');
+    return;
+  }
+
   if (!text || text.trim() === '') {
     sendDebugMessage('No transcript to save');
     return;
@@ -324,11 +355,13 @@ function saveTranscriptToStorage(text, sender, sessionId, meetingCode) {
       formattedDate: formattedDate,
       meetingId: meetId,
       text: text,
-      timestampsFixed: wasFixed
+      timestampsFixed: wasFixed,
+      isEnglish: isEnglish !== false // Default to true unless explicitly set to false
     };
     
     // Log what we're saving
     console.log('Saving transcript to storage:', transcriptEntry);
+    console.log('Is English session:', transcriptEntry.isEnglish !== false);
     
     // Save to chrome.storage.local
     chrome.storage.local.get(['transcripts'], (result) => {
@@ -366,8 +399,8 @@ function saveTranscriptToStorage(text, sender, sessionId, meetingCode) {
         }
         
         // Notify user that the transcript is ready to view, but only if we haven't
-        // already opened a transcript page for this session
-        if (!transcriptPageOpened) {
+        // already opened a transcript page for this session and the session is in English
+        if (!transcriptPageOpened && transcriptEntry.isEnglish === true) {
           console.log("Opening post-meeting stats page for session", transcriptEntry.sessionId);
           chrome.tabs.create({ url: `post_meeting.html?id=${transcriptEntry.id || transcriptEntry.sessionId}` });
           transcriptPageOpened = true;
@@ -377,6 +410,8 @@ function saveTranscriptToStorage(text, sender, sessionId, meetingCode) {
             transcriptPageOpened = false;
             console.log("Reset transcriptPageOpened flag");
           }, 30000); // Reset after 30 seconds
+        } else if (transcriptEntry.isEnglish !== true) {
+          console.log("Not opening post-meeting stats page because session is not confirmed as English:", transcriptEntry.isEnglish);
         }
         
         // Clear current transcript after saving

@@ -23,6 +23,8 @@ const LANGUAGE_DETECTION_SAMPLE_SIZE = 20;
 const LANGUAGE_DETECTION_CONFIDENCE_THRESHOLD = 59;
 // Flag to mark if current call is non-English
 let isCurrentCallEnglish = true;
+// Flag to mark if current session is English
+let isEnglish = null;
 let currentMeetingCode = null;
 const NON_ENGLISH_BLOCK_EXPIRATION_MS = 60 * 60 * 1000; // 1 hour in milliseconds
 
@@ -124,30 +126,36 @@ async function checkLanguageIsEnglish(text) {
     
     sendLanguageDetectionLog(`Response: Confidence=${data.confidence}, Cached=${data.cached}`);
     
-    const isEnglish = data.confidence >= LANGUAGE_DETECTION_CONFIDENCE_THRESHOLD;
+    const isDetectedEnglish = data.confidence >= LANGUAGE_DETECTION_CONFIDENCE_THRESHOLD;
     
-    if (!isEnglish) {
+    if (!isDetectedEnglish) {
       const warningMsg = `RESULT: Language is not English (score: ${data.confidence})`;
       console.log("[Language Detection]", warningMsg);
       sendLanguageDetectionLog(warningMsg);
       
-      // Stop recording and clear the transcript
+      // Set the English flag to false for this session
+      isEnglish = false;
+      
+      // Send warning message to UI
       chrome.runtime.sendMessage({
         type: 'warning',
         text: 'Language is not English'
       });
       
-      // Stop the recording and clear the transcript
-      stopRecordingAndClearTranscript();
+      // Delete the transcript and prevent further saving
+      deleteTranscriptAndPreventSaving();
       
       return false;
     } else {
       const resultMsg = `RESULT: Language is English (score: ${data.confidence})`;
       console.log("[Language Detection]", resultMsg);
       sendLanguageDetectionLog(resultMsg);
+      
+      // Explicitly set the English flag to true for this session
+      isEnglish = true;
     }
     
-    return isEnglish;
+    return isDetectedEnglish;
   } catch (error) {
     const errorMsg = `ERROR: ${error.message}`;
     console.error("[Language Detection]", errorMsg);
@@ -174,6 +182,12 @@ function sendLanguageDetectionLog(message) {
 
 // Function to save transcript segments to chrome.storage
 function saveTranscriptSegment(force = false) {
+  // Check if this session is marked as non-English, if so, don't save anything
+  if (isEnglish === false) {
+    console.log("[Language Detection] Not saving transcript segment because session is marked as non-English");
+    return;
+  }
+
   if (!isRecording || !lastTranscript) return;
   
   // Only save if we have new content or force is true
@@ -207,6 +221,11 @@ function saveTranscriptSegment(force = false) {
       } else {
         console.log("[Language Detection] Check completed. Is English:", result);
         sendLanguageDetectionLog(`Check completed. Is English: ${result}`);
+        
+        // If not English, don't continue with saving
+        if (!result) {
+          return;
+        }
       }
     }).catch(error => {
       console.error("[Language Detection] Error in language check:", error);
@@ -217,13 +236,20 @@ function saveTranscriptSegment(force = false) {
   // Update word count for next check
   wordCount = currentWordCount;
   
+  // Don't save if this session is marked as non-English (double check)
+  if (isEnglish === false) {
+    console.log("[Language Detection] Not saving transcript segment because session is marked as non-English");
+    return;
+  }
+  
   const segment = {
     sessionId: sessionId,
     meetingCode: getMeetingCode(),
     timestamp: now.toISOString(),
     formattedTime: now.toLocaleTimeString(),
     text: lastTranscript,
-    isComplete: false
+    isComplete: false,
+    isEnglish: isEnglish
   };
   
   // Update last saved length
@@ -376,32 +402,74 @@ function saveTranscriptOnMeetingEnd() {
     return;
   }
   
-  hasReportedFinalTranscript = true;
+  // If language hasn't been checked yet, force a check now before proceeding
+  if (!hasCheckedLanguage && lastTranscript.length > 0) {
+    console.log("[Language Detection] Meeting ended without language check in saveTranscriptOnMeetingEnd - performing check now");
+    sendLanguageDetectionLog("Meeting ended - performing language check now");
+    
+    // Get text for language detection
+    const textToCheck = getLastNWords(lastTranscript, LANGUAGE_DETECTION_SAMPLE_SIZE);
+    
+    // Mark as checked to prevent loops
+    hasCheckedLanguage = true;
+    
+    // Perform synchronous check to block further processing
+    checkLanguageIsEnglish(textToCheck).then(result => {
+      // After language check completes, proceed with the function
+      saveTranscriptOnMeetingEnd();
+    });
+    
+    // Return early to wait for the language check to complete
+    return;
+  }
   
-  // Mark the current segment as complete
-  const segment = {
-    sessionId: sessionId,
-    meetingCode: getMeetingCode(),
-    timestamp: new Date().toISOString(),
-    formattedTime: new Date().toLocaleTimeString(),
-    text: lastTranscript,
-    isComplete: true
-  };
+  // If this session is not English, delete all data about it
+  if (isEnglish === false) {
+    console.log("[Language Detection] Meeting ended with non-English session - deleting all session data");
+    
+    // Delete the current transcript
+    lastTranscript = '';
+    
+    // Mark as reported to prevent automatic save
+    hasReportedFinalTranscript = true;
+    
+    // Delete any stored segment for this session
+    chrome.storage.local.remove([`transcript_segment_${sessionId}`], () => {
+      console.log(`Deleted transcript segment for non-English session ${sessionId}`);
+    });
+    
+    // Notify that session data was deleted
+    chrome.runtime.sendMessage({
+      type: 'debug',
+      text: 'Meeting ended: Non-English session data deleted'
+    });
+    
+    return;
+  }
   
-  // Save the final state
-  const data = {};
-  data[`transcript_segment_${sessionId}`] = segment;
-  data['latest_session_id'] = sessionId;
-  data['latest_complete_session'] = sessionId;
+  // Use reportFinalTranscript to handle the English flag check and reporting
+  reportFinalTranscript();
   
-  chrome.storage.local.set(data);
-  
-  // Send a single message to save transcript - use meetingEnded type for clarity
-  chrome.runtime.sendMessage({
-    type: 'meetingEnded',
-    sessionId: sessionId,
-    text: lastTranscript.trim()
-  });
+  // Mark the current segment as complete if it's an English session
+  if (isEnglish === true) {
+    const segment = {
+      sessionId: sessionId,
+      meetingCode: getMeetingCode(),
+      timestamp: new Date().toISOString(),
+      formattedTime: new Date().toLocaleTimeString(),
+      text: lastTranscript,
+      isComplete: true,
+      isEnglish: true
+    };
+    
+    // Save the final state
+    const data = {};
+    data[`transcript_segment_${sessionId}`] = segment;
+    data['latest_session_id'] = sessionId;
+    data['latest_complete_session'] = sessionId;
+    
+    chrome.storage.local.set(data);
+  }
 }
 
 // Initialize and auto-start on Google Meet
@@ -621,7 +689,75 @@ new MutationObserver(() => {
       
       // Explicitly save transcript - but only if not already done
       if (lastTranscript && !hasReportedFinalTranscript) {
-        saveTranscriptOnMeetingEnd();
+        // If language hasn't been checked yet, force a check now before proceeding
+        if (!hasCheckedLanguage && lastTranscript.length > 0) {
+          console.log("[Language Detection] Meeting ended via DOM change without language check - performing check now");
+          sendLanguageDetectionLog("Meeting ended via DOM change - performing language check now");
+          
+          // Get text for language detection
+          const textToCheck = getLastNWords(lastTranscript, LANGUAGE_DETECTION_SAMPLE_SIZE);
+          
+          // Mark as checked to prevent loops
+          hasCheckedLanguage = true;
+          
+          // Perform synchronous check to block further processing
+          checkLanguageIsEnglish(textToCheck).then(() => {
+            // After language check completes, continue with the normal flow
+            // The isEnglish flag will be set by the checkLanguageIsEnglish function
+            
+            // If this session is not English, delete all data about it
+            if (isEnglish === false) {
+              console.log("[Language Detection] Meeting ended via DOM change with non-English session - deleting all session data");
+              
+              // Delete the current transcript
+              lastTranscript = '';
+              
+              // Mark as reported to prevent automatic save
+              hasReportedFinalTranscript = true;
+              
+              // Delete any stored segment for this session
+              chrome.storage.local.remove([`transcript_segment_${sessionId}`], () => {
+                console.log(`Deleted transcript segment for non-English session ${sessionId}`);
+              });
+              
+              // Notify that session data was deleted
+              chrome.runtime.sendMessage({
+                type: 'debug',
+                text: 'Meeting ended (DOM change): Non-English session data deleted'
+              });
+            } else {
+              // Only save if it's an English session or language not yet determined
+              saveTranscriptOnMeetingEnd();
+            }
+          });
+          
+          return; // Return early to wait for language check
+        }
+        
+        // If this session is not English, delete all data about it
+        if (isEnglish === false) {
+          console.log("[Language Detection] Meeting ended via DOM change with non-English session - deleting all session data");
+          
+          // Delete the current transcript
+          lastTranscript = '';
+          
+          // Mark as reported to prevent automatic save
+          hasReportedFinalTranscript = true;
+          
+          // Delete any stored segment for this session
+          chrome.storage.local.remove([`transcript_segment_${sessionId}`], () => {
+            console.log(`Deleted transcript segment for non-English session ${sessionId}`);
+          });
+          
+          // Notify that session data was deleted
+          chrome.runtime.sendMessage({
+            type: 'debug',
+            text: 'Meeting ended (DOM change): Non-English session data deleted'
+          });
+        } else {
+          // Only save if it's an English session or language not yet determined
+          saveTranscriptOnMeetingEnd();
+        }
       }
     }
   }
@@ -738,6 +874,9 @@ function startRecording() {
     // Reset language detection flag
     hasCheckedLanguage = false;
     wordCount = 0;
+    
+    // Reset the English flag for the new session - set to null (not yet determined)
+    isEnglish = null;
     
     // Generate a new session ID for this recording
     sessionId = generateSessionId();
@@ -910,9 +1049,10 @@ function startRecording() {
             
             console.log('Reporting final transcript:', lastTranscript);
             chrome.runtime.sendMessage({
-              type: 'finalTranscript',
+              type: 'meetingEnded',
               sessionId: sessionId,
-              text: lastTranscript.trim()
+              text: lastTranscript.trim(),
+              isEnglish: isEnglish === true ? true : false
             });
           }
         }
@@ -966,18 +1106,8 @@ function stopRecording() {
   
   // Report the final transcript only if not already reported
   if (lastTranscript && !hasReportedFinalTranscript) {
-    console.log('Reporting final transcript:', lastTranscript);
-    
-    // Mark as reported to prevent duplicate calls
-    hasReportedFinalTranscript = true;
-    
-    // Save the transcript directly via the meetingEnded message
-    // This is cleaner than sending finalTranscript and then saveTranscriptOnMeetingEnd
-    chrome.runtime.sendMessage({
-      type: 'meetingEnded',
-      sessionId: sessionId,
-      text: lastTranscript.trim()
-    });
+    // Use our new reportFinalTranscript function
+    reportFinalTranscript();
   }
   
   updateRecordingStatus();
@@ -992,7 +1122,8 @@ function stopRecording() {
 function updateRecordingStatus() {
   chrome.runtime.sendMessage({
     type: 'recordingStatus',
-    isRecording: isRecording
+    isRecording: isRecording,
+    isEnglish: isEnglish
   });
   
   // Visual indicator removed as requested
@@ -1016,7 +1147,59 @@ window.addEventListener('beforeunload', (event) => {
   // Make sure to save transcript when window is closed
   if (isRecording && lastTranscript && !hasReportedFinalTranscript) {
     console.log("Window closing while recording, saving transcript");
-    saveTranscriptOnMeetingEnd();
+    
+    // If language hasn't been checked yet, force a check now before proceeding
+    if (!hasCheckedLanguage && lastTranscript.length > 0) {
+      console.log("[Language Detection] Window closing without language check - performing check now");
+      
+      // Get text for language detection
+      const textToCheck = getLastNWords(lastTranscript, LANGUAGE_DETECTION_SAMPLE_SIZE);
+      
+      // Mark as checked to prevent loops
+      hasCheckedLanguage = true;
+      
+      // Perform a synchronous language check (this is a special case for beforeunload)
+      try {
+        // This is a synchronous request which is normally bad practice,
+        // but we need it for the beforeunload event
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', 'http://localhost:8000/detect_language', false); // false makes it synchronous
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.send(JSON.stringify({ text: textToCheck }));
+        
+        if (xhr.status === 200) {
+          const response = JSON.parse(xhr.responseText);
+          const isDetectedEnglish = response.confidence >= LANGUAGE_DETECTION_CONFIDENCE_THRESHOLD;
+          
+          // Set the flag based on the result
+          isEnglish = isDetectedEnglish;
+          
+          console.log("[Language Detection] Window closing language check result:", isEnglish);
+        }
+      } catch (e) {
+        console.error("[Language Detection] Error in synchronous language check:", e);
+        // Don't change the isEnglish flag in case of error
+      }
+    }
+    
+    // If this session is not English, delete all data about it
+    if (isEnglish === false) {
+      console.log("[Language Detection] Window closing with non-English session - deleting all session data");
+      
+      // Delete the current transcript
+      lastTranscript = '';
+      
+      // Delete any stored segment for this session
+      chrome.storage.local.remove([`transcript_segment_${sessionId}`], () => {
+        console.log(`Deleted transcript segment for non-English session ${sessionId}`);
+      });
+      
+      // Don't save anything for non-English sessions
+      hasReportedFinalTranscript = true;
+    } else {
+      // Only save if it's an English session or language not yet determined
+      saveTranscriptOnMeetingEnd();
+    }
   }
   
   stopRecording();
@@ -1031,7 +1214,76 @@ document.addEventListener('visibilitychange', () => {
     const isActive = isMeetingActive();
     if (!isActive && lastTranscript && !hasReportedFinalTranscript) {
       console.log("Meeting not active and page hidden, saving transcript");
-      saveTranscriptOnMeetingEnd();
+      
+      // If language hasn't been checked yet, force a check now before proceeding
+      if (!hasCheckedLanguage && lastTranscript.length > 0) {
+        console.log("[Language Detection] Page hidden without language check - performing check now");
+        sendLanguageDetectionLog("Page hidden - performing language check now");
+        
+        // Get text for language detection
+        const textToCheck = getLastNWords(lastTranscript, LANGUAGE_DETECTION_SAMPLE_SIZE);
+        
+        // Mark as checked to prevent loops
+        hasCheckedLanguage = true;
+        
+        // Perform check and then continue with the normal flow
+        checkLanguageIsEnglish(textToCheck).then(() => {
+          // After language check completes, continue with the normal flow
+          // The isEnglish flag will be set by the checkLanguageIsEnglish function
+          
+          // If this session is not English, delete all data about it
+          if (!isEnglish) {
+            console.log("[Language Detection] Page hidden with non-English session - deleting all session data");
+            
+            // Delete the current transcript
+            lastTranscript = '';
+            
+            // Mark as reported to prevent automatic save
+            hasReportedFinalTranscript = true;
+            
+            // Delete any stored segment for this session
+            chrome.storage.local.remove([`transcript_segment_${sessionId}`], () => {
+              console.log(`Deleted transcript segment for non-English session ${sessionId}`);
+            });
+            
+            // Notify that session data was deleted
+            chrome.runtime.sendMessage({
+              type: 'debug',
+              text: 'Meeting ended (page hidden): Non-English session data deleted'
+            });
+          } else {
+            // Only save if it's an English session
+            saveTranscriptOnMeetingEnd();
+          }
+        });
+        
+        return; // Return early to wait for language check
+      }
+      
+      // If this session is not English, delete all data about it
+      if (!isEnglish) {
+        console.log("[Language Detection] Page hidden with non-English session - deleting all session data");
+        
+        // Delete the current transcript
+        lastTranscript = '';
+        
+        // Mark as reported to prevent automatic save
+        hasReportedFinalTranscript = true;
+        
+        // Delete any stored segment for this session
+        chrome.storage.local.remove([`transcript_segment_${sessionId}`], () => {
+          console.log(`Deleted transcript segment for non-English session ${sessionId}`);
+        });
+        
+        // Notify that session data was deleted
+        chrome.runtime.sendMessage({
+          type: 'debug',
+          text: 'Meeting ended (page hidden): Non-English session data deleted'
+        });
+      } else {
+        // Only save if it's an English session
+        saveTranscriptOnMeetingEnd();
+      }
     }
   }
 });
@@ -1384,10 +1636,25 @@ function detectVoiceActivity(audioData) {
 
 // Function to stop recording and clear the transcript when non-English is detected
 function stopRecordingAndClearTranscript() {
-  console.log("[Language Detection] Non-English language detected - stopping recording and clearing transcript");
-  sendLanguageDetectionLog("Non-English detected! Stopping recording and deleting transcript");
+  // Use the new function to handle deletion and prevention of saving
+  deleteTranscriptAndPreventSaving();
+}
+
+// Function to delete transcript and prevent saving
+function deleteTranscriptAndPreventSaving() {
+  console.log("[Language Detection] Non-English language detected - deleting transcript and preventing saving");
+  sendLanguageDetectionLog("Non-English detected! Deleting transcript and preventing saving");
   
-  // Mark this call as non-English
+  // Delete the current transcript
+  lastTranscript = '';
+  
+  // Mark as reported to prevent automatic save
+  hasReportedFinalTranscript = true;
+  
+  // Mark this session as non-English
+  isEnglish = false;
+  
+  // Also mark the meeting as non-English (for future recordings in same meeting)
   isCurrentCallEnglish = false;
   
   // Get the current meeting code and store it
@@ -1417,12 +1684,6 @@ function stopRecordingAndClearTranscript() {
   // Stop auto-save
   stopAutoSave();
   
-  // Clear the transcript
-  lastTranscript = '';
-  
-  // Mark as reported to prevent automatic save
-  hasReportedFinalTranscript = true;
-  
   // Update recording status
   updateRecordingStatus();
   
@@ -1438,6 +1699,55 @@ function stopRecordingAndClearTranscript() {
     sessionId: sessionId,
     meetingCode: meetingCode,
     expirationTime: new Date(currentTime.getTime() + NON_ENGLISH_BLOCK_EXPIRATION_MS).toISOString()
+  });
+}
+
+// Function to report the final transcript
+function reportFinalTranscript() {
+  if (!lastTranscript || hasReportedFinalTranscript) return;
+  
+  // If language hasn't been checked yet, force a check now before proceeding
+  if (!hasCheckedLanguage && lastTranscript.length > 0) {
+    console.log("[Language Detection] Meeting ended without language check - performing check now");
+    sendLanguageDetectionLog("Meeting ended - performing language check now");
+    
+    // Get text for language detection
+    const textToCheck = getLastNWords(lastTranscript, LANGUAGE_DETECTION_SAMPLE_SIZE);
+    
+    // Mark as checked to prevent loops
+    hasCheckedLanguage = true;
+    
+    // Perform synchronous check to block further processing until we know the language
+    return checkLanguageIsEnglish(textToCheck).then(result => {
+      if (result === false) {
+        // Language is not English, don't proceed with saving
+        console.log("[Language Detection] Final check determined language is not English - deleting transcript");
+        return;
+      } else {
+        // Language is English or check failed (we'll assume English in that case)
+        // Continue with normal processing
+        return reportFinalTranscript();
+      }
+    });
+  }
+  
+  // Skip if this session is marked as non-English
+  if (isEnglish === false) {
+    console.log("[Language Detection] Not reporting final transcript because session is marked as non-English");
+    return;
+  }
+  
+  console.log('Reporting final transcript:', lastTranscript);
+  
+  // Mark as reported to prevent duplicate calls
+  hasReportedFinalTranscript = true;
+  
+  // Send the transcript to background.js
+  chrome.runtime.sendMessage({
+    type: 'meetingEnded',
+    sessionId: sessionId,
+    text: lastTranscript.trim(),
+    isEnglish: isEnglish === true ? true : false
   });
 }
 
