@@ -377,68 +377,6 @@ function calculateWordStats(text) {
   console.log("Unique words set:", [...uniqueWords].sort());
   console.log("Unique word count:", uniqueWords.size);
   
-  // Verify with the test transcript
-  if (text.includes("hi hi do you hear me") && text.includes("okay bye")) {
-    console.log("Detected test transcript - expected counts: 41 total, 20 unique");
-    
-    // Expected words in the test transcript
-    const expectedWords = [
-      "hi", "hi", "do", "you", "hear", "me", "yes", "I", "do", "okay", 
-      "what", "will", "going", "to", "do", "yes", "yes", "no", "no", "I", 
-      "don't", "want", "to", "see", "today", "blah", "blah", "blah", "blah", 
-      "okay", "okay", "oh", "no", "I", "don't", "want", "to", "see", "today", 
-      "okay", "bye"
-    ];
-    console.log("Expected word count:", expectedWords.length);
-    
-    // Expected unique words
-    const expectedUniqueWords = [
-      "hi", "do", "you", "hear", "me", "yes", "i", "okay", "what", "will", 
-      "going", "to", "no", "don't", "want", "see", "today", "blah", "oh", "bye"
-    ];
-    console.log("Expected unique word count:", expectedUniqueWords.length);
-    
-    // Verify our word count matches the expected count
-    if (allWords.length !== expectedWords.length) {
-      console.warn(`Word count discrepancy: got ${allWords.length}, expected ${expectedWords.length}`);
-      console.log("Difference:", Math.abs(allWords.length - expectedWords.length));
-      
-      // Find differences
-      const ourWordsStr = allWords.join(' ');
-      const expectedWordsStr = expectedWords.join(' ');
-      console.log("Our words:", ourWordsStr);
-      console.log("Expected words:", expectedWordsStr);
-    } else {
-      console.log("Word count matches expected value!");
-    }
-    
-    // Verify unique word count
-    if (uniqueWords.size !== expectedUniqueWords.length) {
-      console.warn(`Unique word count discrepancy: got ${uniqueWords.size}, expected ${expectedUniqueWords.length}`);
-      
-      // Find differences in unique words
-      const ourUniqueWords = [...uniqueWords].sort();
-      const expectedUniqueSorted = [...expectedUniqueWords].sort();
-      
-      console.log("Our unique words:", ourUniqueWords);
-      console.log("Expected unique words:", expectedUniqueSorted);
-      
-      // Find words in our set that are not in expected
-      const extraWords = ourUniqueWords.filter(word => !expectedUniqueSorted.includes(word));
-      if (extraWords.length > 0) {
-        console.log("Extra words in our set:", extraWords);
-      }
-      
-      // Find words in expected that are not in our set
-      const missingWords = expectedUniqueSorted.filter(word => !ourUniqueWords.includes(word));
-      if (missingWords.length > 0) {
-        console.log("Missing words from our set:", missingWords);
-      }
-    } else {
-      console.log("Unique word count matches expected value!");
-    }
-  }
-  
   return {
     uniqueWordsCount: uniqueWords.size,
     totalWords: allWords.length
