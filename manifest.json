@@ -33,7 +33,8 @@
   "web_accessible_resources": [
     {
       "resources": ["transcript_stats.js", "post_meeting.js", "post_meeting.html", "vad-processor.js"],
-      "matches": ["<all_urls>"]
+      "matches": ["<all_urls>"],
+      "matchAboutBlank": true
     }
   ],
   "icons": {
