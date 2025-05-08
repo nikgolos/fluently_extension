@@ -11,10 +11,6 @@ let meetingDetectionInterval = null;
 let meetingEndCheckInterval = null;
 let autoSaveInterval = null;
 let lastSavedLength = 0;
-let vadEnergyThreshold = 0.01;
-let lastEnergyLevel = 0;
-let energySamples = [];
-const ENERGY_SAMPLE_COUNT = 10;
 // For language detection
 let wordCount = 0;
 let hasCheckedLanguage = false;
@@ -805,6 +801,25 @@ function cleanupRecognition() {
     }
   }
   
+  // Clean up audio context and VAD processor
+  if (window.vadProcessor) {
+    try {
+      window.vadProcessor.disconnect();
+      window.vadProcessor = null;
+    } catch (e) {
+      console.warn("Error cleaning up VAD processor:", e);
+    }
+  }
+  
+  if (window.vadAudioContext) {
+    try {
+      window.vadAudioContext.close();
+      window.vadAudioContext = null;
+    } catch (e) {
+      console.warn("Error closing audio context:", e);
+    }
+  }
+  
   isRecording = false;
   updateRecordingStatus();
 }
@@ -1376,15 +1391,17 @@ async function setupEnhancedAudioProcessing() {
     const audioContext = new (window.AudioContext || window.webkitAudioContext)();
     const source = audioContext.createMediaStreamSource(stream);
     
-    // Create a processor node for Voice Activity Detection
-    if (audioContext.createScriptProcessor) {
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+    // Create a processor node for Voice Activity Detection using AudioWorkletNode
+    try {
+      // Load and register the worklet processor
+      await audioContext.audioWorklet.addModule(chrome.runtime.getURL('vad-processor.js'));
       
-      processor.onaudioprocess = (e) => {
-        const input = e.inputBuffer.getChannelData(0);
-        
-        // Check for voice activity
-        const hasVoice = detectVoiceActivity(input);
+      // Create the AudioWorkletNode
+      const vadNode = new AudioWorkletNode(audioContext, 'vad-processor');
+      
+      // Set up the message handler to receive voice activity detection results
+      vadNode.port.onmessage = (event) => {
+        const { hasVoice } = event.data;
         
         // If speech recognition is active, use this information
         if (recognition && hasVoice && !recognition.speechStartTime) {
@@ -1394,12 +1411,13 @@ async function setupEnhancedAudioProcessing() {
       };
       
       // Connect the nodes
-      source.connect(processor);
-      processor.connect(audioContext.destination);
+      source.connect(vadNode);
       
       // Store for cleanup
-      window.vadProcessor = processor;
+      window.vadProcessor = vadNode;
       window.vadAudioContext = audioContext;
+    } catch (error) {
+      console.warn("AudioWorklet not supported, VAD disabled:", error);
     }
     
     // Try to apply the enhanced audio configuration directly to the SpeechRecognition object
@@ -1698,35 +1716,6 @@ function startStandardRecognition() {
       error: error.message
     });
   }
-}
-
-// New helper function to detect voice activity
-function detectVoiceActivity(audioData) {
-  if (!audioData || audioData.length === 0) return false;
-  
-  // Simple energy-based voice detection
-  let energy = 0;
-  
-  // Calculate energy from audio samples
-  for (let i = 0; i < audioData.length; i++) {
-    energy += Math.abs(audioData[i]);
-  }
-  
-  energy = energy / audioData.length;
-  lastEnergyLevel = energy;
-  
-  // Collect energy samples for adaptive threshold
-  energySamples.push(energy);
-  if (energySamples.length > ENERGY_SAMPLE_COUNT) {
-    energySamples.shift();
-    
-    // Adapt threshold based on recent energy levels
-    const avgEnergy = energySamples.reduce((sum, val) => sum + val, 0) / energySamples.length;
-    vadEnergyThreshold = avgEnergy * 1.2; // Set threshold slightly above average
-  }
-  
-  // Return true if energy is above threshold (voice detected)
-  return energy > vadEnergyThreshold;
 }
 
 // Function to stop recording and clear the transcript when non-English is detected
