@@ -107,13 +107,13 @@ h1 {
   flex-shrink: 0;
   position: relative;
 }
-.badges {
+.badge-green {
   background: var(--green, #2dad14);
   border-radius: 100px;
   border-style: solid;
   border-color: transparent;
-  border-width: 3px;
-  padding: 0px 4px 0px 4px;
+  border-width: 1px;
+  padding: 0px 4px 0px 5px;
   display: flex;
   flex-direction: row;
   gap: 0px;
@@ -129,7 +129,7 @@ h1 {
   color: var(--white, #ffffff);
   text-align: center;
   font-family: var(--m3-label-small-font-family, "Roboto-Medium", sans-serif);
-  font-size: var(--m3-label-small-font-size, 11px);
+  font-size: var(--m3-label-small-font-size, 12px);
   line-height: var(--m3-label-small-line-height, 16px);
   letter-spacing: var(--m3-label-small-letter-spacing, 0.5px);
   font-weight: var(--m3-label-small-font-weight, 500);
@@ -151,13 +151,13 @@ h1 {
   flex-shrink: 0;
   position: relative;
 }
-.badges2 {
+.badge-red {
   background: var(--red, #ea4335);
   border-radius: 100px;
   border-style: solid;
   border-color: transparent;
-  border-width: 3px;
-  padding: 0px 4px 0px 4px;
+  border-width: 1px;
+  padding: 0px 4px 0px 5px;
   display: flex;
   flex-direction: row;
   gap: 0px;
@@ -185,7 +185,7 @@ h1 {
   color: var(--blue, #0957d0);
   text-align: right;
   font-family: "DmMono-Medium", sans-serif;
-  font-size: 10px;
+  font-size: 12px;
   line-height: 12px;
   font-weight: 500;
   position: absolute;
