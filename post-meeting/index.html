@@ -34,6 +34,15 @@
        margin: 0;
        padding: 0;
    }
+
+   /* Tab hover effects */
+   .general-tab, .grammar-tab, .vocabulary-tab, .fluency-tab {
+       cursor: pointer;
+   }
+
+   .general-tab:hover, .grammar-tab:hover, .vocabulary-tab:hover, .fluency-tab:hover {
+       background-color: #e8f0fe;
+   }
    </style>
   <title>Document</title>
 </head>
@@ -45,7 +54,7 @@
           class="adobe-express-file-1-2-1"
           src="src/adobe-express-file-1-2-10.png"
         />
-        <h1>Let’s review your English mistakes</h1>
+        <h1>Let's review your English mistakes</h1>
       </div>
       <div class="menu-tabs">
         <div class="general-tab tab-selected">
@@ -176,7 +185,7 @@
             <div class="h-3-header">Articles</div>
             <div class="text">
               <div class="your-errors-in-using-a-an-or-the">
-                Your errors in using “a,” “an,” or “the”:
+                Your errors in using "a," "an," or "the":
               </div>
             </div>
           </div>
@@ -380,7 +389,7 @@
                 <div class="better-to-say">
                   <div class="better-to-say2">Better to say:</div>
                   <div class="we-re-a-growing-startup-making-waves-in-the-industry">
-                    We&#039;re a growing startup making waves in the industry
+                    We're a growing startup making waves in the industry
                   </div>
                 </div>
               </div>
@@ -448,7 +457,7 @@
                 </div>
               </div>
               <div class="it-s-faster-than-the-recommended-level">
-                It’s faster than the recommended level
+                It's faster than the recommended level
               </div>
             </div>
           </div>
@@ -484,6 +493,46 @@
     </div>
   </div>
 
-  
+  <script>
+    // Get all tab elements
+    const generalTab = document.querySelector('.general-tab');
+    const grammarTab = document.querySelector('.grammar-tab');
+    const vocabularyTab = document.querySelector('.vocabulary-tab');
+    const fluencyTab = document.querySelector('.fluency-tab');
+    
+    // Get all content sections
+    const generalTabBody = document.querySelector('.general-tab-body');
+    const grammarTabBody = document.querySelector('.grammar-tab-body');
+    const vocabularyTabBody = document.querySelector('.vocabulary-tab-body');
+    const fluencyTabBody = document.querySelector('.fluency-tab-body');
+    
+    // Function to handle tab clicks
+    function switchTab(activeTab, activeContent) {
+      // Remove selected class from all tabs
+      [generalTab, grammarTab, vocabularyTab, fluencyTab].forEach(tab => {
+        tab.classList.remove('tab-selected');
+      });
+      
+      // Hide all content sections
+      [generalTabBody, grammarTabBody, vocabularyTabBody, fluencyTabBody].forEach(content => {
+        content.style.display = 'none';
+      });
+      
+      // Activate selected tab and content
+      activeTab.classList.add('tab-selected');
+      activeContent.style.display = '';
+    }
+    
+    // Add click event listeners to tabs
+    generalTab.addEventListener('click', () => switchTab(generalTab, generalTabBody));
+    grammarTab.addEventListener('click', () => switchTab(grammarTab, grammarTabBody));
+    vocabularyTab.addEventListener('click', () => switchTab(vocabularyTab, vocabularyTabBody));
+    fluencyTab.addEventListener('click', () => switchTab(fluencyTab, fluencyTabBody));
+    
+    // Initialize - hide non-selected tab bodies
+    grammarTabBody.style.display = 'none';
+    vocabularyTabBody.style.display = 'none';
+    fluencyTabBody.style.display = 'none';
+  </script>
 </body>
 </html>
