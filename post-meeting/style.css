@@ -753,7 +753,7 @@ h1 {
 .text-section {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
   align-items: flex-start;
   justify-content: flex-start;
   align-self: stretch;
@@ -784,6 +784,7 @@ h1 {
   position: relative;
 }
 .grammar-error {
+  min-width: 308px;
   background: var(--white, #ffffff);
   border-radius: 8px;
   padding: 12px 8px 12px 8px;

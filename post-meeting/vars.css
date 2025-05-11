@@ -19,5 +19,19 @@
   );
 
   /* Fonts */
+  --font-primary: 'Google Sans', 'Roboto', sans-serif;
+  --m3-display-small-font-family: 'Google Sans', 'Roboto', sans-serif;
+  --m3-label-large-font-family: 'Google Sans', 'Roboto', sans-serif;
+  --m3-label-small-font-family: 'Google Sans', 'Roboto', sans-serif;
+  --m3-title-medium-font-family: 'Google Sans', 'Roboto', sans-serif;
+  --m3-body-medium-font-family: 'Google Sans', 'Roboto', sans-serif;
+  --body-medium-font: 'Google Sans', 'Roboto', sans-serif;
+  --title-3-emphasized-font-family: 'Google Sans', 'Roboto', sans-serif;
+  --body-small-font-family: 'Google Sans', 'Roboto', sans-serif;
+  --body-small-strong-font-family: 'Google Sans', 'Roboto', sans-serif;
+  --var-sds-typography-body-font-family: 'Google Sans', 'Roboto', sans-serif;
+  --m3-label-large-prominent-font-family: 'Google Sans', 'Roboto', sans-serif;
+  --subheadline-regular-font-family: 'Google Sans', 'Roboto', sans-serif;
+  
   /* Effects */
 }

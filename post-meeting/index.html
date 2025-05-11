@@ -4,6 +4,12 @@
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  
   <link rel="stylesheet" href="./vars.css">
   <link rel="stylesheet" href="./style.css">
   
@@ -25,8 +31,12 @@
        border: none;
        text-decoration: none;
        background: none;
-   
+       font-family: 'Google Sans', 'Roboto', sans-serif;
        -webkit-font-smoothing: antialiased;
+   }
+   
+   body {
+       font-family: 'Google Sans', 'Roboto', sans-serif;
    }
    
    menu, ol, ul {
@@ -42,6 +52,109 @@
 
    .general-tab:hover, .grammar-tab:hover, .vocabulary-tab:hover, .fluency-tab:hover {
        background-color: #e8f0fe;
+   }
+   
+   /* Tooltip styles for error explanations */
+   .info-circle-fill-1 {
+       cursor: pointer;
+       position: relative;
+   }
+   
+   /* Additional styles for grammar errors */
+   .normal-word {
+       color: black;
+   }
+   .strikethrough-word {
+       color: red;
+       text-decoration: line-through;
+   }
+   .added-word {
+       color: green;
+   }
+   
+   /* Loading indicator */
+   .loading {
+       text-align: center;
+       padding: 20px;
+       color: #666;
+   }
+   
+   /* Error message */
+   .error {
+       text-align: center;
+       padding: 20px;
+       color: red;
+   }
+   
+   
+   .grammar-error > div:first-child {
+       flex: 1;
+       padding-right: 10px;
+   }
+   
+   /* Text element in grammar errors */
+   .grammar-error-text {
+       width: 100%;
+       line-height: 1.5;
+       word-wrap: break-word;
+   }
+   
+   /* Add extra spacing between words */
+   .normal-word, .strikethrough-word, .added-word {
+       margin-right: 0px;
+   }
+   
+   /* Override all direct font declarations to use Google Sans */
+   .general * {
+       font-family: 'Google Sans', 'Roboto', sans-serif !important;
+   }
+   
+   /* Loader styles */
+   .loader-overlay {
+       position: fixed;
+       top: 0;
+       left: 0;
+       width: 100%;
+       height: 100%;
+       background-color: rgba(255, 255, 255, 0.85);
+       display: flex;
+       flex-direction: column;
+       justify-content: center;
+       align-items: center;
+       z-index: 1000;
+   }
+   
+   .loader-spinner {
+       width: 50px;
+       height: 50px;
+       border: 5px solid #f3f3f3;
+       border-top: 5px solid #3498db;
+       border-radius: 50%;
+       animation: spin 1s linear infinite;
+       margin-bottom: 20px;
+   }
+   
+   .loader-text {
+       font-size: 18px;
+       color: #333;
+       font-family: 'Google Sans', 'Roboto', sans-serif;
+       font-weight: 500;
+   }
+   
+   @keyframes spin {
+       0% { transform: rotate(0deg); }
+       100% { transform: rotate(360deg); }
+   }
+   
+   /* No errors message */
+   .no-errors {
+       text-align: center;
+       padding: 30px;
+       font-size: 18px;
+       color: #34a853;
+       background-color: #f0f8f1;
+       border-radius: 8px;
+       margin: 20px 0;
    }
    </style>
   <title>Document</title>
@@ -180,78 +293,8 @@
         </div>
       </div>
       <div class="grammar-cards">
-        <div class="grammar-card">
-          <div class="text-section">
-            <div class="h-3-header">Articles</div>
-            <div class="text">
-              <div class="your-errors-in-using-a-an-or-the">
-                Your errors in using "a," "an," or "the":
-              </div>
-            </div>
-          </div>
-          <div class="grammar-errors">
-            <div class="grammar-error">
-              <div class="she-swim-is-swimming-in-the-pool-now">
-                <span>
-                  <span class="she-swim-is-swimming-in-the-pool-now-span">she</span>
-                  <span class="she-swim-is-swimming-in-the-pool-now-span2">
-                    swim
-                  </span>
-                  <span class="she-swim-is-swimming-in-the-pool-now-span"></span>
-                  <span class="she-swim-is-swimming-in-the-pool-now-span3">
-                    is swimming
-                  </span>
-                  <span class="she-swim-is-swimming-in-the-pool-now-span">
-                    in the pool now
-                  </span>
-                </span>
-              </div>
-              <div class="info-circle-fill-1">
-                <img class="group" src="src/group0.svg" />
-              </div>
-            </div>
-            <div class="grammar-error">
-              <div class="influence-on-so-many-people">
-                <span>
-                  <span class="influence-on-so-many-people-span">influence</span>
-                  <span class="influence-on-so-many-people-span2">on</span>
-                  <span class="influence-on-so-many-people-span">
-                    so many people
-                  </span>
-                </span>
-              </div>
-              <div class="info-circle-fill-1">
-                <img class="group2" src="src/group0.svg" />
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="grammar-card">
-          <div class="text-section">
-            <div class="h-3-header">Verb Forms</div>
-            <div class="text">
-              <div class="your-errors-in-using-verb-tenses-or-forms">
-                Your errors in using verb tenses or forms:
-              </div>
-            </div>
-          </div>
-          <div class="grammar-errors">
-            <div class="grammar-error2">
-              <div class="influence-on-so-many-people">
-                <span>
-                  <span class="influence-on-so-many-people-span">influence</span>
-                  <span class="influence-on-so-many-people-span2">on</span>
-                  <span class="influence-on-so-many-people-span">
-                    so many people
-                  </span>
-                </span>
-              </div>
-              <div class="info-circle-fill-1">
-                <img class="group3" src="src/group0.svg" />
-              </div>
-            </div>
-          </div>
-        </div>
+        <!-- Grammar cards will be dynamically inserted here by JavaScript -->
+        <div class="loading">Loading grammar analysis...</div>
       </div>
     </div>
     <div class="vocabulary-tab-body">
@@ -525,7 +568,12 @@
     
     // Add click event listeners to tabs
     generalTab.addEventListener('click', () => switchTab(generalTab, generalTabBody));
-    grammarTab.addEventListener('click', () => switchTab(grammarTab, grammarTabBody));
+    
+    // Load grammar data on grammar tab click
+    grammarTab.addEventListener('click', () => {
+      switchTab(grammarTab, grammarTabBody);
+    });
+    
     vocabularyTab.addEventListener('click', () => switchTab(vocabularyTab, vocabularyTabBody));
     fluencyTab.addEventListener('click', () => switchTab(fluencyTab, fluencyTabBody));
     
@@ -534,5 +582,12 @@
     vocabularyTabBody.style.display = 'none';
     fluencyTabBody.style.display = 'none';
   </script>
+  
+  <!-- Load our JavaScript files -->
+  <script src="./text-comparator.js"></script>
+  <script src="./tooltip.js"></script>
+  <script src="./api-service.js"></script>
+  <script src="./test-data-loader.js"></script>
+  <script src="./main.js"></script>
 </body>
 </html>
