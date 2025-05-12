@@ -269,7 +269,7 @@ h1 {
   color: var(--text-grey, #5f6367);
   text-align: left;
   font-family: "Roboto-Regular", sans-serif;
-  font-size: 16px;
+  font-size: 17px;
   line-height: var(--label-large-line-height, 20px);
   letter-spacing: var(--label-large-tracking, 0.1px);
   font-weight: 400;
@@ -716,7 +716,7 @@ h1 {
   color: var(--text-grey, #5f6367);
   text-align: left;
   font-family: "Roboto-Regular", sans-serif;
-  font-size: 16px;
+  font-size: 17px;
   line-height: var(--label-large-line-height, 20px);
   letter-spacing: var(--label-large-tracking, 0.1px);
   font-weight: 400;
@@ -823,7 +823,7 @@ h1 {
 .she-swim-is-swimming-in-the-pool-now-span2 {
   color: var(--red, #ea4335);
   font-family: "Roboto-Regular", sans-serif;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 20px;
   letter-spacing: 0.25px;
   text-decoration: line-through;
@@ -960,7 +960,7 @@ h1 {
   color: var(--text-grey, #5f6367);
   text-align: left;
   font-family: "Roboto-Regular", sans-serif;
-  font-size: 16px;
+  font-size: 17px;
   line-height: var(--label-large-line-height, 20px);
   letter-spacing: var(--label-large-tracking, 0.1px);
   font-weight: 400;
@@ -1283,7 +1283,7 @@ h1 {
 .you-said .rephrasing-text {
   color: var(--text-grey, #5f6367);
   font-family: var(--m3-body-medium-font-family, "Roboto-Regular", sans-serif);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 18px;
   letter-spacing: 0.25px;
 }
@@ -1291,7 +1291,7 @@ h1 {
 .better-to-say .rephrasing-text {
   color: var(--text-black, #212121);
   font-family: var(--m3-body-medium-font-family, "Roboto-Regular", sans-serif);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 18px;
   letter-spacing: 0.25px;
 }
@@ -1390,7 +1390,7 @@ h1 {
   color: var(--text-grey, #5f6367);
   text-align: left;
   font-family: "Roboto-Regular", sans-serif;
-  font-size: 16px;
+  font-size: 17px;
   line-height: var(--label-large-line-height, 20px);
   letter-spacing: var(--label-large-tracking, 0.1px);
   font-weight: 400;

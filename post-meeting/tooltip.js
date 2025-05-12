@@ -32,7 +32,7 @@ class Tooltip {
                 color: #fff;
                 padding: 8px 12px;
                 border-radius: 4px;
-                font-size: 14px;
+                font-size: 15px;
                 font-family: 'Google Sans', 'Roboto', sans-serif;
                 max-width: 300px;
                 z-index: 1000;
