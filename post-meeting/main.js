@@ -34,6 +34,9 @@ async function initApp() {
         // Add event listeners to tabs
         setupTabListeners();
         
+        // Load stats for General tab first
+        await loadGeneralStats();
+        
         // Initialize grammar tab with data from API
         await loadGrammarData();
     } catch (error) {
@@ -856,6 +859,131 @@ async function copyToClipboard(text) {
             document.body.removeChild(textArea);
             throw err;
         }
+    }
+}
+
+// Load general stats from API
+async function loadGeneralStats() {
+    try {
+        // Store the original content of the general tab
+        const generalTabBody = document.querySelector('.general-tab-body');
+        const originalContent = generalTabBody.innerHTML;
+        
+        // Clear the content and show loader
+        generalTabBody.innerHTML = '';
+        showTabLoader('.general-tab-body');
+        isLoading = true;
+        
+        // Strip timestamps before sending to API
+        const cleanText = stripTimestamps(transcriptText);
+        
+        // Get stats data from API
+        statsData = await apiService.getEnglishStats(cleanText);
+        
+        // Log the raw data received from the API
+        console.log('Raw english_stats API response:', statsData);
+        console.log('English score:', statsData.english_score);
+        console.log('Grammar score:', statsData.grammar_score);
+        console.log('Vocabulary score:', statsData.vocabulary_score);
+        console.log('Fluency score:', statsData.fluency_score);
+        
+        // Log the full data structure as JSON
+        console.log('Full english_stats data (JSON):', JSON.stringify(statsData, null, 2));
+        
+        // Restore the original content
+        generalTabBody.innerHTML = originalContent;
+        
+        // Process and display stats data
+        displayGeneralStats(statsData);
+        
+        // Hide loader
+        hideTabLoader('.general-tab-body');
+        isLoading = false;
+    } catch (error) {
+        console.error('Error loading general stats:', error);
+        
+        // Restore the original view if available
+        const generalTabBody = document.querySelector('.general-tab-body');
+        if (generalTabBody && !generalTabBody.querySelector('.general-header')) {
+            generalTabBody.innerHTML = `
+                <div class="general-header">
+                    <div class="header2">
+                        <div class="icon">⭐️</div>
+                        <div class="h-2-header">General</div>
+                    </div>
+                    <div class="frame-565">
+                        <div class="paragraph">
+                            Error analyzing your speech. Please try again.
+                        </div>
+                    </div>
+                </div>
+                <div class="general-cards">
+                    <!-- Original cards would go here -->
+                </div>
+            `;
+        }
+        
+        hideTabLoader('.general-tab-body');
+        isLoading = false;
+    }
+}
+
+// Display stats in the General tab
+function displayGeneralStats(data) {
+    if (!data) {
+        console.error('No stats data received');
+        return;
+    }
+    
+    console.log('Displaying general stats:', data);
+    
+    try {
+        // Update English score - use general_score from backend
+        const englishScore = data.general_score || data.english_score || 0;
+        console.log('Using score from backend:', englishScore);
+        
+        const scoreElement = document.querySelector('.frame-569 .h-3-header');
+        if (scoreElement) {
+            scoreElement.textContent = `Your English score: ${englishScore}`;
+        }
+        
+        // Update the "out 100" text in a separate element with gray color
+        const outOfElement = document.querySelector('.frame-569 .h-3-header2');
+        if (outOfElement) {
+            outOfElement.textContent = 'out 100';
+            outOfElement.style.color = '#5f6368'; // Text-gray color
+        }
+        
+        // Update vocabulary score
+        const vocabularyScore = data.vocabulary_score || 74; // Fallback to default
+        const vocabularyElement = document.querySelector('.title3 .title-3-span3');
+        if (vocabularyElement) {
+            vocabularyElement.textContent = `${vocabularyScore}%`;
+        }
+        
+        // Update grammar score
+        const grammarScore = data.grammar_score || 80; // Fallback to default
+        const grammarElement = document.querySelector('.title2 .title-2-span3');
+        if (grammarElement) {
+            grammarElement.textContent = `${grammarScore}%`;
+        }
+        
+        // Update fluency score if available
+        const fluencyScore = data.fluency_score || 47; // Fallback to default
+        const fluencyElement = document.querySelector('.title .title-span3');
+        if (fluencyElement) {
+            fluencyElement.textContent = `${fluencyScore}%`;
+        }
+        
+        // Update summary text if available
+        if (data.summary) {
+            const paragraphElement = document.querySelector('.frame-565 .paragraph');
+            if (paragraphElement) {
+                paragraphElement.textContent = data.summary;
+            }
+        }
+    } catch (error) {
+        console.error('Error updating general stats UI:', error);
     }
 }
 
