@@ -10,8 +10,6 @@ let isLoading = false;
 
 // Initialize the application
 async function initApp() {
-    showLoader();
-    
     try {
         // Get transcript ID from the URL query parameter
         const urlParams = new URLSearchParams(window.location.search);
@@ -38,10 +36,8 @@ async function initApp() {
         
         // Initialize grammar tab with data from API
         await loadGrammarData();
-        hideLoader();
     } catch (error) {
         console.error('Error initializing app:', error);
-        hideLoader();
         
         // Show error message
         document.body.innerHTML += `
@@ -150,34 +146,42 @@ function stripTimestamps(text) {
     return text.replace(/\[\d{2}:\d{2}:\d{2}\]\s?/g, '');
 }
 
-// Show loader overlay
-function showLoader() {
+// Show loader in a specific tab body
+function showTabLoader(tabBodySelector) {
     isLoading = true;
     
-    // Create loader if it doesn't exist
-    if (!document.querySelector('.loader-overlay')) {
-        const loaderOverlay = document.createElement('div');
-        loaderOverlay.className = 'loader-overlay';
+    const tabBody = document.querySelector(tabBodySelector);
+    if (!tabBody) return;
+    
+    // Create loader if it doesn't exist in this tab
+    if (!tabBody.querySelector('.tab-loader')) {
+        const loaderContainer = document.createElement('div');
+        loaderContainer.className = 'tab-loader';
+        loaderContainer.style.cssText = 'display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px; width: 100%;';
         
         const loaderSpinner = document.createElement('div');
         loaderSpinner.className = 'loader-spinner';
+        loaderSpinner.style.cssText = 'width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px;';
         
         const loaderText = document.createElement('div');
         loaderText.className = 'loader-text';
-        loaderText.textContent = 'Analyzing your English...';
+        loaderText.textContent = 'Analyzing...';
+        loaderText.style.cssText = 'font-size: 18px; color: #333; font-family: "Google Sans", "Roboto", sans-serif; font-weight: 500;';
         
-        loaderOverlay.appendChild(loaderSpinner);
-        loaderOverlay.appendChild(loaderText);
-        document.body.appendChild(loaderOverlay);
+        loaderContainer.appendChild(loaderSpinner);
+        loaderContainer.appendChild(loaderText);
+        tabBody.appendChild(loaderContainer);
     } else {
-        document.querySelector('.loader-overlay').style.display = 'flex';
+        tabBody.querySelector('.tab-loader').style.display = 'flex';
     }
 }
 
-// Hide loader overlay
-function hideLoader() {
-    isLoading = false;
-    const loader = document.querySelector('.loader-overlay');
+// Hide loader in a specific tab body
+function hideTabLoader(tabBodySelector) {
+    const tabBody = document.querySelector(tabBodySelector);
+    if (!tabBody) return;
+    
+    const loader = tabBody.querySelector('.tab-loader');
     if (loader) {
         loader.style.display = 'none';
     }
@@ -206,12 +210,15 @@ function setupTabListeners() {
 // Load grammar data from API
 async function loadGrammarData() {
     try {
-        // Show loading state
-        showLoader();
+        // Show loading state in grammar tab body
+        showTabLoader('.grammar-tab-body');
+        isLoading = true;
         
         // Show loading indicator in grammar cards section
         const grammarCards = document.querySelector('.grammar-cards');
-        grammarCards.innerHTML = '<div class="loading">Loading grammar analysis...</div>';
+        if (grammarCards) {
+            grammarCards.innerHTML = '<div class="loading">Loading grammar analysis...</div>';
+        }
         
         // Strip timestamps before sending to API
         const cleanText = stripTimestamps(transcriptText);
@@ -230,12 +237,16 @@ async function loadGrammarData() {
         updateGrammarParagraph(mistakesCount);
         
         // Hide loader
-        hideLoader();
+        hideTabLoader('.grammar-tab-body');
+        isLoading = false;
     } catch (error) {
         console.error('Error loading grammar data:', error);
         const grammarCards = document.querySelector('.grammar-cards');
-        grammarCards.innerHTML = '<div class="error">Error loading grammar analysis. Please try again.</div>';
-        hideLoader();
+        if (grammarCards) {
+            grammarCards.innerHTML = '<div class="error">Error loading grammar analysis. Please try again.</div>';
+        }
+        hideTabLoader('.grammar-tab-body');
+        isLoading = false;
     }
 }
 
@@ -386,12 +397,15 @@ function updateGrammarParagraph(mistakesCount) {
 // Load vocabulary data from API
 async function loadVocabularyData() {
     try {
-        // Show loading state
-        showLoader();
+        // Show loading state in vocabulary tab body
+        showTabLoader('.vocabulary-tab-body');
+        isLoading = true;
         
         // Show loading indicator in vocabulary cards section
         const vocabularyCards = document.querySelector('.vocabulary-cards');
-        vocabularyCards.innerHTML = '<div class="loading">Loading vocabulary analysis...</div>';
+        if (vocabularyCards) {
+            vocabularyCards.innerHTML = '<div class="loading">Loading vocabulary analysis...</div>';
+        }
         
         // Strip timestamps before sending to API
         const cleanText = stripTimestamps(transcriptText);
@@ -410,12 +424,16 @@ async function loadVocabularyData() {
         updateVocabularyParagraph(suggestionsCount);
         
         // Hide loader
-        hideLoader();
+        hideTabLoader('.vocabulary-tab-body');
+        isLoading = false;
     } catch (error) {
         console.error('Error loading vocabulary data:', error);
         const vocabularyCards = document.querySelector('.vocabulary-cards');
-        vocabularyCards.innerHTML = '<div class="error">Error loading vocabulary analysis. Please try again.</div>';
-        hideLoader();
+        if (vocabularyCards) {
+            vocabularyCards.innerHTML = '<div class="error">Error loading vocabulary analysis. Please try again.</div>';
+        }
+        hideTabLoader('.vocabulary-tab-body');
+        isLoading = false;
     }
 }
 
