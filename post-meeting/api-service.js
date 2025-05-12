@@ -64,9 +64,8 @@ class ApiService {
             return response;
         } catch (error) {
             console.error('Failed to get grammar analysis:', error);
-            // For development, fallback to test data if API fails
-            console.log('Falling back to test data due to API error');
-            return TestDataLoader.simulateGrammarResponse(text);
+            // Return an empty result on error
+            return { grammar: { mistakes: [] } };
         }
     }
 
@@ -148,9 +147,8 @@ class ApiService {
             return response;
         } catch (error) {
             console.error('Failed to get vocabulary analysis:', error);
-            // For development, fallback to test data if API fails
-            console.log('Falling back to test data due to API error');
-            return TestDataLoader.simulateVocabularyResponse(text);
+            // Return an empty result on error
+            return { vocabulary: { synonyms: [], rephrasing: [] } };
         }
     }
     

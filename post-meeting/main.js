@@ -13,18 +13,141 @@ async function initApp() {
     showLoader();
     
     try {
-        // Load transcript data from file
-        transcriptText = await TestDataLoader.loadTranscript();
+        // Get transcript ID from the URL query parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        const transcriptId = urlParams.get('id');
+        
+        if (!transcriptId) {
+            throw new Error('No transcript ID provided in URL');
+        }
+        
+        // Load transcript data from chrome storage
+        transcriptText = await loadTranscriptFromStorage(transcriptId);
+        
+        if (!transcriptText) {
+            throw new Error('Failed to load transcript data');
+        }
+        
+        console.log('Loaded transcript:', transcriptText.substring(0, 100) + '...');
+        
+        // Update meeting info (date and time)
+        updateMeetingInfo(transcriptId);
         
         // Add event listeners to tabs
         setupTabListeners();
         
         // Initialize grammar tab with data from API
         await loadGrammarData();
+        hideLoader();
     } catch (error) {
         console.error('Error initializing app:', error);
         hideLoader();
+        
+        // Show error message
+        document.body.innerHTML += `
+            <div style="text-align: center; margin: 2rem; color: red;">
+                Error loading transcript: ${error.message}
+            </div>
+        `;
     }
+}
+
+// Load transcript from Chrome storage
+async function loadTranscriptFromStorage(transcriptId) {
+    return new Promise((resolve, reject) => {
+        chrome.storage.local.get(null, function(result) {
+            if (chrome.runtime.lastError) {
+                return reject(new Error('Error accessing storage: ' + chrome.runtime.lastError.message));
+            }
+            
+            console.log('Chrome storage contents:', result);
+            
+            // Try to find the transcript in result.transcripts (object format)
+            if (result.transcripts) {
+                // Check if transcripts is an object with ID as keys
+                if (typeof result.transcripts === 'object' && !Array.isArray(result.transcripts)) {
+                    const transcript = result.transcripts[transcriptId];
+                    if (transcript) {
+                        console.log('Found transcript in transcripts object:', transcript);
+                        return resolve(transcript.text || '');
+                    }
+                } 
+                // Check if transcripts is an array
+                else if (Array.isArray(result.transcripts)) {
+                    const transcript = result.transcripts.find(t => t.id === transcriptId || t.sessionId === transcriptId);
+                    if (transcript) {
+                        console.log('Found transcript in transcripts array:', transcript);
+                        return resolve(transcript.text || '');
+                    }
+                }
+            }
+            
+            // Try to find the transcript directly at the root level
+            if (result[transcriptId]) {
+                console.log('Found transcript at root level:', result[transcriptId]);
+                return resolve(result[transcriptId].text || result[transcriptId]);
+            }
+            
+            // If we get here, we haven't found the transcript yet
+            // Let's search all storage for anything that might be our transcript
+            for (const key in result) {
+                if (key.includes(transcriptId) || (typeof result[key] === 'object' && result[key] && result[key].id === transcriptId)) {
+                    console.log(`Found potential transcript match in key ${key}:`, result[key]);
+                    if (result[key].text) {
+                        return resolve(result[key].text);
+                    } else if (typeof result[key] === 'string') {
+                        return resolve(result[key]);
+                    }
+                }
+            }
+            
+            return reject(new Error(`Transcript with ID ${transcriptId} not found in storage`));
+        });
+    });
+}
+
+// Update meeting info with date and time from transcript ID or storage
+function updateMeetingInfo(transcriptId) {
+    try {
+        // Try to parse date from transcript ID (if it contains a timestamp)
+        let meetingDate;
+        
+        if (transcriptId.includes('-')) {
+            const timestamp = parseInt(transcriptId.split('-')[0]);
+            if (!isNaN(timestamp)) {
+                meetingDate = new Date(timestamp);
+            }
+        }
+        
+        // If we couldn't parse from ID, use current date
+        if (!meetingDate || isNaN(meetingDate.getTime())) {
+            meetingDate = new Date();
+        }
+        
+        // Format the date and time
+        const options = { 
+            month: 'numeric', 
+            day: 'numeric', 
+            year: 'numeric',
+            hour: 'numeric',
+            minute: 'numeric',
+            hour12: true
+        };
+        const formattedDateTime = meetingDate.toLocaleDateString('en-US', options);
+        
+        // Update the meeting info in the UI
+        const meetingInfoElement = document.querySelector('.meeting-info');
+        if (meetingInfoElement) {
+            meetingInfoElement.textContent = formattedDateTime;
+        }
+    } catch (error) {
+        console.error('Error updating meeting info:', error);
+    }
+}
+
+// Remove timestamps in [HH:MM:SS] format from text
+function stripTimestamps(text) {
+    return text.replace(/\[\d{2}:\d{2}:\d{2}\]\s?/g, '');
 }
 
 // Show loader overlay
@@ -90,14 +213,17 @@ async function loadGrammarData() {
         const grammarCards = document.querySelector('.grammar-cards');
         grammarCards.innerHTML = '<div class="loading">Loading grammar analysis...</div>';
         
+        // Strip timestamps before sending to API
+        const cleanText = stripTimestamps(transcriptText);
+        
         // Get grammar data from API
-        grammarData = await apiService.getGrammarAnalysis(transcriptText);
+        grammarData = await apiService.getGrammarAnalysis(cleanText);
         
         // Process and display grammar data
         displayGrammarData(grammarData);
         
         // Update badge count
-        const mistakesCount = grammarData.grammar.mistakes.length;
+        const mistakesCount = grammarData.grammar && grammarData.grammar.mistakes ? grammarData.grammar.mistakes.length : 0;
         updateGrammarBadgeCount(mistakesCount);
         
         // Update paragraph text based on mistakes count
@@ -250,11 +376,9 @@ function updateGrammarParagraph(mistakesCount) {
     const paragraph = document.querySelector('.grammar-header .paragraph');
     if (paragraph) {
         if (mistakesCount === 0) {
-            paragraph.textContent = 'Great job! No grammar errors found in your speech.';
-        } else if (mistakesCount <= 2) {
-            paragraph.textContent = `Found ${mistakesCount} minor grammar issues. Fix them to improve your score.`;
+            paragraph.textContent = 'Great job! No grammar mistakes found in your speech.';
         } else {
-            paragraph.textContent = `Fix your ${mistakesCount} grammar mistakes to improve your score.`;
+            paragraph.textContent = 'Fix your mistakes with Articles and Verb Forms to improve your score.';
         }
     }
 }
@@ -262,8 +386,6 @@ function updateGrammarParagraph(mistakesCount) {
 // Load vocabulary data from API
 async function loadVocabularyData() {
     try {
-        console.log('Loading vocabulary data from API...');
-        
         // Show loading state
         showLoader();
         
@@ -271,21 +393,20 @@ async function loadVocabularyData() {
         const vocabularyCards = document.querySelector('.vocabulary-cards');
         vocabularyCards.innerHTML = '<div class="loading">Loading vocabulary analysis...</div>';
         
+        // Strip timestamps before sending to API
+        const cleanText = stripTimestamps(transcriptText);
+        
         // Get vocabulary data from API
-        vocabularyData = await apiService.getVocabularyAnalysis(transcriptText);
-        console.log('Vocabulary data received:', vocabularyData);
+        vocabularyData = await apiService.getVocabularyAnalysis(cleanText);
         
         // Process and display vocabulary data
         displayVocabularyData(vocabularyData);
         
         // Update badge count
-        const suggestionsCount = (vocabularyData.vocabulary.synonyms?.length || 0) + 
-                                (vocabularyData.vocabulary.rephrasing?.length || 0);
-        console.log(`Found ${suggestionsCount} vocabulary suggestions`);
-        
+        const suggestionsCount = countVocabularySuggestions(vocabularyData);
         updateVocabularyBadgeCount(suggestionsCount);
         
-        // Update paragraph text for vocabulary
+        // Update paragraph text based on suggestions count
         updateVocabularyParagraph(suggestionsCount);
         
         // Hide loader
@@ -296,6 +417,16 @@ async function loadVocabularyData() {
         vocabularyCards.innerHTML = '<div class="error">Error loading vocabulary analysis. Please try again.</div>';
         hideLoader();
     }
+}
+
+// Count total vocabulary suggestions
+function countVocabularySuggestions(data) {
+    if (!data || !data.vocabulary) return 0;
+    
+    const synonymsCount = data.vocabulary.synonyms ? data.vocabulary.synonyms.length : 0;
+    const rephrasingCount = data.vocabulary.rephrasing ? data.vocabulary.rephrasing.length : 0;
+    
+    return synonymsCount + rephrasingCount;
 }
 
 // Display vocabulary data in the UI
@@ -618,5 +749,100 @@ function updateVocabularyParagraph(suggestionsCount) {
     }
 }
 
-// Initialize the app when DOM is loaded
-document.addEventListener('DOMContentLoaded', initApp); 
+// Setup button handlers
+function setupButtonHandlers() {
+    const shareButton = document.querySelector('.share-button');
+    const returnButton = document.querySelector('.return-button');
+    
+    // Share button handler
+    if (shareButton) {
+        shareButton.addEventListener('click', () => {
+            // Create a text summary to share
+            const summaryText = createShareableSummary();
+            
+            // Copy to clipboard
+            copyToClipboard(summaryText)
+                .then(() => alert('Stats copied to clipboard!'))
+                .catch(err => console.error('Failed to copy:', err));
+        });
+    }
+    
+    // Return to Google Meet button handler
+    if (returnButton) {
+        returnButton.addEventListener('click', () => {
+            // Try to get the meeting ID from chrome storage or URL
+            chrome.storage.local.get(['last_meeting_url'], function(result) {
+                const meetingUrl = result.last_meeting_url;
+                
+                if (meetingUrl && meetingUrl.includes('meet.google.com')) {
+                    // Open the meeting URL in the current tab
+                    window.location.href = meetingUrl;
+                } else {
+                    // If we don't have a meeting URL, just go to Google Meet
+                    window.location.href = 'https://meet.google.com/';
+                }
+            });
+        });
+    }
+}
+
+// Create shareable summary text
+function createShareableSummary() {
+    // Get the meeting info
+    const meetingInfo = document.querySelector('.meeting-info').textContent;
+    
+    // Create the summary text
+    let summary = `English Analysis from Fluently - ${meetingInfo}\n\n`;
+    
+    // Check for grammar mistakes
+    const grammarBadge = document.querySelector('.grammar-tab .badge-label');
+    const grammarCount = grammarBadge ? parseInt(grammarBadge.textContent) : 0;
+    summary += `Grammar Mistakes: ${grammarCount}\n`;
+    
+    // Check for vocabulary suggestions
+    const vocabBadge = document.querySelector('.vocabulary-tab .badge-label');
+    const vocabCount = vocabBadge ? parseInt(vocabBadge.textContent) : 0;
+    summary += `Vocabulary Suggestions: ${vocabCount}\n`;
+    
+    // Add fluency data if we have it
+    const uselessWords = document.querySelector('.fluency-tab-body .h-3-header');
+    if (uselessWords) {
+        summary += `${uselessWords.textContent}\n`;
+    }
+    
+    summary += `\nGenerated by Fluently - Your AI English Coach for Google Meet`;
+    
+    return summary;
+}
+
+// Helper function to copy text to clipboard
+async function copyToClipboard(text) {
+    if (navigator.clipboard) {
+        return navigator.clipboard.writeText(text);
+    } else {
+        // Fallback for browsers without clipboard API
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        try {
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textArea);
+            if (!successful) {
+                throw new Error('Failed to copy text');
+            }
+        } catch (err) {
+            document.body.removeChild(textArea);
+            throw err;
+        }
+    }
+}
+
+// Initialize when the page loads
+document.addEventListener('DOMContentLoaded', () => {
+    initApp();
+    setupButtonHandlers();
+}); 
