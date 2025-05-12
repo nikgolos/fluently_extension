@@ -30,13 +30,13 @@ I checked your website before the call and I saw you have a team of more than te
 
 EasyPlan is a simple tool to manage projects. You can make task lists, assign to people, and see progress in calendar view. Also we have reminders, so no one forget what they need to do.
 
-The nice thing is, it’s very easy to use. Even someone who never use planning apps before can learn in one or two days.
+The nice thing is, it's very easy to use. Even someone who never use planning apps before can learn in one or two days.
 
 We already work with more than 500 companies in Europe, mostly in tech and marketing.
 
-Maybe I ask you, how do you manage your work now? You use some software or it’s all by emails and messages?
+Maybe I ask you, how do you manage your work now? You use some software or it's all by emails and messages?
 
-Ah, Trello. Yes, many people use that. It’s nice tool but sometime becomes too complex when you have many projects, no?
+Ah, Trello. Yes, many people use that. It's nice tool but sometime becomes too complex when you have many projects, no?
 
 We are more simple than Trello, and also we have better support. Our team reply fast and can help you to setup everything.
 
@@ -52,7 +52,7 @@ We are not pushing anyone, just want to see if we are fit.
 
 Even if you not decide now, we are happy to stay in contact for future.
 
-So… What you think?`;
+So... What you think?`;
         }
     }
 
@@ -90,6 +90,52 @@ So… What you think?`;
                         error: "so no one forget",
                         correct: "so no one forgets",
                         explanation: "Use 's' at the end of verbs with third-person singular subjects."
+                    }
+                ]
+            }
+        };
+    }
+
+    /**
+     * Simulate API response for vocabulary analysis (for testing without backend)
+     * @param {string} text - The transcript text
+     * @returns {Promise<Object>} - Simulated API response
+     */
+    static simulateVocabularyResponse(text) {
+        console.log('Simulating vocabulary response for testing...');
+        // Pre-defined vocabulary suggestions for testing
+        return {
+            vocabulary: {
+                synonyms: [
+                    {
+                        original: "a small company but growing fast",
+                        to_replace: "small",
+                        suggestions: ["boutique", "compact", "modest"],
+                        explanation: "More specific and professional alternatives that elevate the description of your company size."
+                    },
+                    {
+                        original: "our product can be helpful for you",
+                        to_replace: "helpful",
+                        suggestions: ["beneficial", "advantageous", "valuable"],
+                        explanation: "These alternatives convey a stronger positive impact than 'helpful', which sounds basic."
+                    },
+                    {
+                        original: "it's very easy to use",
+                        to_replace: "easy",
+                        suggestions: ["intuitive", "straightforward", "user-friendly"],
+                        explanation: "These terms are more specific about the nature of the ease of use and sound more professional."
+                    }
+                ],
+                rephrasing: [
+                    {
+                        original: "if you want, I can send you email",
+                        native_version: "if you're interested, I'd be happy to email you",
+                        explanation: "This phrasing sounds more professional and offers the service in a more engaging way."
+                    },
+                    {
+                        original: "so no one forget what they need to do",
+                        native_version: "ensuring everyone stays on top of their responsibilities",
+                        explanation: "This phrasing is more professional and positive, focusing on the benefit rather than preventing a negative."
                     }
                 ]
             }

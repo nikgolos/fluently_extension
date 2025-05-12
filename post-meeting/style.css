@@ -972,13 +972,9 @@ h1 {
 .vocabulary-cards {
   display: flex;
   flex-direction: row;
-  gap: 14px;
-  align-items: flex-start;
-  justify-content: flex-start;
   flex-wrap: wrap;
-  align-content: flex-start;
-  flex-shrink: 0;
-  max-width: 710px;
+  gap: 16px;
+  width: 100%;
   position: relative;
 }
 .synonyms {
@@ -1011,7 +1007,7 @@ h1 {
 .synonyms-cards {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   align-items: flex-start;
   justify-content: flex-start;
   flex-shrink: 0;
@@ -1261,129 +1257,97 @@ h1 {
   flex: 1;
   position: relative;
 }
-.you-said {
+.you-said, .better-to-say {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  align-items: flex-start;
-  justify-content: flex-start;
-  align-self: stretch;
-  flex-shrink: 0;
-  position: relative;
+  gap: 4px;
+  width: 100%;
 }
-.you-said2 {
+
+.you-said .rephrasing-label {
   color: var(--red, #ea4335);
-  text-align: left;
-  font-family: var(--m3-body-medium-font-family, "Roboto-Regular", sans-serif);
-  font-size: var(--m3-body-medium-font-size, 14px);
-  line-height: var(--m3-body-medium-line-height, 20px);
-  letter-spacing: var(--m3-body-medium-letter-spacing, 0.25px);
-  font-weight: var(--m3-body-medium-font-weight, 400);
-  position: relative;
-  align-self: stretch;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
+  font-family: var(--m3-body-small-font-family, "Roboto-Regular", sans-serif);
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.25px;
 }
-.we-help-businesses-like-yours-to-make-better-planning-and-organize-tasks-more-good {
+
+.better-to-say .rephrasing-label {
+  color: var(--green, #2dad14);
+  font-family: var(--m3-body-small-font-family, "Roboto-Regular", sans-serif);
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.25px;
+}
+
+.you-said .rephrasing-text {
   color: var(--text-grey, #5f6367);
-  text-align: left;
   font-family: var(--m3-body-medium-font-family, "Roboto-Regular", sans-serif);
-  font-size: var(--m3-body-medium-font-size, 14px);
-  line-height: var(--m3-body-medium-line-height, 20px);
-  letter-spacing: var(--m3-body-medium-letter-spacing, 0.25px);
-  font-weight: var(--m3-body-medium-font-weight, 400);
-  position: relative;
-  align-self: stretch;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
+  font-size: 14px;
+  line-height: 18px;
+  letter-spacing: 0.25px;
 }
-.better-to-say {
+
+.better-to-say .rephrasing-text {
+  color: var(--text-black, #212121);
+  font-family: var(--m3-body-medium-font-family, "Roboto-Regular", sans-serif);
+  font-size: 14px;
+  line-height: 18px;
+  letter-spacing: 0.25px;
+}
+
+.a-small-company-but-growing-fast-span2 {
+  color: red;
+}
+
+/* Fix info icon positioning in cards */
+.synonyms-card .info-circle-fill-1 {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Info icon tooltip styles */
+.info-circle-fill-1:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  width: 220px;
+  z-index: 10;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 5px;
+}
+
+/* Add spacing between synonym cards */
+.synonyms-cards {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  align-items: flex-start;
-  justify-content: flex-start;
-  align-self: stretch;
-  flex-shrink: 0;
-  position: relative;
+  gap: 12px;
 }
-.better-to-say2 {
-  color: var(--green, #2dad14);
-  text-align: left;
-  font-family: var(--m3-body-medium-font-family, "Roboto-Regular", sans-serif);
-  font-size: var(--m3-body-medium-font-size, 14px);
-  line-height: var(--m3-body-medium-line-height, 20px);
-  letter-spacing: var(--m3-body-medium-letter-spacing, 0.25px);
-  font-weight: var(--m3-body-medium-font-weight, 400);
-  position: relative;
-  align-self: stretch;
+
+/* Make vocabulary cards container use flexbox for better layout */
+.vocabulary-cards {
   display: flex;
-  align-items: center;
-  justify-content: flex-start;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 16px;
+  width: 100%;
 }
-.we-help-businesses-like-yours-streamline-planning-and-organize-tasks-more-efficiently {
-  color: var(--text-black, #212121);
-  text-align: left;
-  font-family: var(--m3-body-medium-font-family, "Roboto-Regular", sans-serif);
-  font-size: var(--m3-body-medium-font-size, 14px);
-  line-height: var(--m3-body-medium-line-height, 20px);
-  letter-spacing: var(--m3-body-medium-letter-spacing, 0.25px);
-  font-weight: var(--m3-body-medium-font-weight, 400);
+
+/* Fix for text column in vocabulary cards */
+.text-section {
   position: relative;
-  align-self: stretch;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
 }
-.group3 {
-  width: 97.51%;
-  height: 99.95%;
+
+.text-section .info-circle-fill-1 {
   position: absolute;
-  right: 2.49%;
-  left: 0%;
-  bottom: 0.05%;
-  top: 0%;
-  overflow: visible;
-}
-.we-are-a-small-company-but-growing-fast {
-  color: var(--text-grey, #5f6367);
-  text-align: left;
-  font-family: var(--m3-body-medium-font-family, "Roboto-Regular", sans-serif);
-  font-size: var(--m3-body-medium-font-size, 14px);
-  line-height: var(--m3-body-medium-line-height, 20px);
-  letter-spacing: var(--m3-body-medium-letter-spacing, 0.25px);
-  font-weight: var(--m3-body-medium-font-weight, 400);
-  position: relative;
-  align-self: stretch;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-.we-re-a-growing-startup-making-waves-in-the-industry {
-  color: var(--text-black, #212121);
-  text-align: left;
-  font-family: var(--m3-body-medium-font-family, "Roboto-Regular", sans-serif);
-  font-size: var(--m3-body-medium-font-size, 14px);
-  line-height: var(--m3-body-medium-line-height, 20px);
-  letter-spacing: var(--m3-body-medium-letter-spacing, 0.25px);
-  font-weight: var(--m3-body-medium-font-weight, 400);
-  position: relative;
-  align-self: stretch;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-.group4 {
-  width: 97.51%;
-  height: 99.95%;
-  position: absolute;
-  right: 2.49%;
-  left: 0%;
-  bottom: 0.05%;
-  top: 0%;
-  overflow: visible;
+  right: 0;
+  top: 0;
 }
 
 .fluency-tab-body,

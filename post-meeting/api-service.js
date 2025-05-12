@@ -109,7 +109,102 @@ class ApiService {
 
     // Get vocabulary suggestions from the backend
     async getVocabularyAnalysis(text) {
-        return this.makeRequest('/english_vocabulary', 'POST', { text });
+        try {
+            const response = await this.makeRequest('/english_vocabulary', 'POST', { text });
+            console.log('Raw vocabulary response:', response);
+            
+            // Normalize the response to ensure proper structure
+            if (!response.vocabulary || 
+                (!response.vocabulary.synonyms && 
+                 !response.vocabulary.rephrasing && 
+                 !response.vocabulary.vocabulary_elevation && 
+                 !response.vocabulary.native_phrasing)) {
+                console.warn('API response missing expected vocabulary structure:', response);
+                
+                // Try to normalize the response if it has a different structure
+                const normalizedResponse = this.normalizeVocabularyResponse(response);
+                if (normalizedResponse) {
+                    console.log('Normalized vocabulary response structure');
+                    return normalizedResponse;
+                }
+                
+                // If we couldn't normalize, return empty structure
+                console.warn('Could not find vocabulary suggestions in API response, returning empty arrays');
+                return { vocabulary: { synonyms: [], rephrasing: [] } };
+            }
+            
+            // If the response uses vocabulary_elevation and native_phrasing fields instead of synonyms and rephrasing
+            if (response.vocabulary.vocabulary_elevation || response.vocabulary.native_phrasing) {
+                const normalized = {
+                    vocabulary: {
+                        synonyms: response.vocabulary.vocabulary_elevation || [],
+                        rephrasing: response.vocabulary.native_phrasing || []
+                    }
+                };
+                console.log('Normalized vocabulary field names:', normalized);
+                return normalized;
+            }
+            
+            return response;
+        } catch (error) {
+            console.error('Failed to get vocabulary analysis:', error);
+            // For development, fallback to test data if API fails
+            console.log('Falling back to test data due to API error');
+            return TestDataLoader.simulateVocabularyResponse(text);
+        }
+    }
+    
+    // Helper method to try to normalize a non-standard vocabulary response
+    normalizeVocabularyResponse(response) {
+        // If the response has synonyms, rephrasing, vocabulary_elevation, or native_phrasing at the root level
+        if (response.synonyms || response.rephrasing || 
+            response.vocabulary_elevation || response.native_phrasing) {
+            console.log('Found vocabulary data at root level, normalizing');
+            return {
+                vocabulary: {
+                    synonyms: response.synonyms || response.vocabulary_elevation || [],
+                    rephrasing: response.rephrasing || response.native_phrasing || []
+                }
+            };
+        }
+        
+        // Look for any arrays that might contain vocabulary suggestions
+        for (const key in response) {
+            if (Array.isArray(response[key])) {
+                // Check if this array contains objects that look like synonym suggestions
+                const potentialSynonyms = response[key].filter(item => 
+                    item.original && item.to_replace && Array.isArray(item.suggestions));
+                    
+                // Check if this array contains objects that look like rephrasing suggestions
+                const potentialRephrasing = response[key].filter(item => 
+                    item.original && item.native_version);
+                
+                if (potentialSynonyms.length > 0 || potentialRephrasing.length > 0) {
+                    console.log('Found potential vocabulary suggestions in', key);
+                    return {
+                        vocabulary: {
+                            synonyms: potentialSynonyms,
+                            rephrasing: potentialRephrasing
+                        }
+                    };
+                }
+            }
+            
+            // If this is an object, check if it has vocabulary_elevation or native_phrasing fields
+            if (typeof response[key] === 'object' && response[key] !== null) {
+                if (response[key].vocabulary_elevation || response[key].native_phrasing) {
+                    console.log('Found vocabulary_elevation/native_phrasing in', key);
+                    return {
+                        vocabulary: {
+                            synonyms: response[key].vocabulary_elevation || [],
+                            rephrasing: response[key].native_phrasing || []
+                        }
+                    };
+                }
+            }
+        }
+        
+        return null;
     }
 
     // Get English stats from the backend

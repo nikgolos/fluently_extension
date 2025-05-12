@@ -304,144 +304,12 @@
           <div class="h-2-header">Vocabulary</div>
         </div>
         <div class="paragraph">
-          Fix your mistakes with Articles and Verb Forms to improve your score
+          Elevate your language with more precise and professional vocabulary
         </div>
       </div>
       <div class="vocabulary-cards">
-        <div class="synonyms">
-          <div class="text-section">
-            <div class="h-3-header">Synonyms</div>
-            <div class="text">
-              <div class="stronger-alternatives-to-the-words-you-used">
-                Stronger alternatives to the words you used
-              </div>
-            </div>
-          </div>
-          <div class="synonyms-cards">
-            <div class="synonyms-card">
-              <div class="synonyms-card-block">
-                <div class="a-small-company-but-growing-fast">
-                  <span>
-                    <span class="a-small-company-but-growing-fast-span">«a</span>
-                    <span class="a-small-company-but-growing-fast-span2">
-                      small
-                    </span>
-                    <span class="a-small-company-but-growing-fast-span">
-                      company but growing fast»
-                    </span>
-                  </span>
-                </div>
-                <div class="words">
-                  <div class="word">
-                    <div class="boutique">boutique</div>
-                  </div>
-                  <div class="word">
-                    <div class="compact">compact</div>
-                  </div>
-                  <div class="word">
-                    <div class="modest">modest</div>
-                  </div>
-                </div>
-              </div>
-              <div class="info-circle-fill-1">
-                <img class="group" src="src/group0.svg" />
-              </div>
-            </div>
-            <div class="synonyms-card">
-              <div class="synonyms-card-block">
-                <div class="make-better-planning-and-organize-tasks-more-good">
-                  <span>
-                    <span
-                      class="make-better-planning-and-organize-tasks-more-good-span"
-                    >
-                      «make
-                    </span>
-                    <span
-                      class="make-better-planning-and-organize-tasks-more-good-span2"
-                    >
-                      better
-                    </span>
-                    <span
-                      class="make-better-planning-and-organize-tasks-more-good-span"
-                    >
-                      planning and organize tasks more good»
-                    </span>
-                  </span>
-                </div>
-                <div class="words">
-                  <div class="word">
-                    <div class="more-effective">more effective</div>
-                  </div>
-                  <div class="word">
-                    <div class="improved">improved</div>
-                  </div>
-                  <div class="word">
-                    <div class="optimized">optimized</div>
-                  </div>
-                </div>
-              </div>
-              <div class="info-circle-fill-1">
-                <img class="group2" src="src/group0.svg" />
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="rephrasing">
-          <div class="text-section">
-            <div class="h-3-header">Rephrasing</div>
-            <div class="text">
-              <div class="improve-phrasing-to-sound-more-like-a-native">
-                Improve phrasing to sound more like a native
-              </div>
-            </div>
-          </div>
-          <div class="rephrasing-cards">
-            <div class="rephrasing-card">
-              <div class="rephrasing-card-block">
-                <div class="you-said">
-                  <div class="you-said2">You said:</div>
-                  <div
-                    class="we-help-businesses-like-yours-to-make-better-planning-and-organize-tasks-more-good"
-                  >
-                    We help businesses like yours to make better planning and
-                    organize tasks more good
-                  </div>
-                </div>
-                <div class="better-to-say">
-                  <div class="better-to-say2">Better to say:</div>
-                  <div
-                    class="we-help-businesses-like-yours-streamline-planning-and-organize-tasks-more-efficiently"
-                  >
-                    We help businesses like yours streamline planning and organize
-                    tasks more efficiently
-                  </div>
-                </div>
-              </div>
-              <div class="info-circle-fill-1">
-                <img class="group3" src="src/group0.svg" />
-              </div>
-            </div>
-            <div class="rephrasing-card">
-              <div class="rephrasing-card-block">
-                <div class="you-said">
-                  <div class="you-said2">You said:</div>
-                  <div class="we-are-a-small-company-but-growing-fast">
-                    We are a small company but growing fast
-                  </div>
-                </div>
-                <div class="better-to-say">
-                  <div class="better-to-say2">Better to say:</div>
-                  <div class="we-re-a-growing-startup-making-waves-in-the-industry">
-                    We're a growing startup making waves in the industry
-                  </div>
-                </div>
-              </div>
-              <div class="info-circle-fill-1">
-                <img class="group4" src="src/group0.svg" />
-              </div>
-            </div>
-          </div>
-        </div>
+        <!-- Vocabulary cards will be dynamically inserted here by JavaScript -->
+        <div class="loading">Loading vocabulary analysis...</div>
       </div>
     </div>
     <div class="fluency-tab-body">
@@ -572,9 +440,23 @@
     // Load grammar data on grammar tab click
     grammarTab.addEventListener('click', () => {
       switchTab(grammarTab, grammarTabBody);
+      
+      // If the main.js is loaded, it will handle data loading via setupTabListeners
+      if (typeof loadGrammarData === 'function' && !grammarData && !isLoading) {
+        loadGrammarData();
+      }
     });
     
-    vocabularyTab.addEventListener('click', () => switchTab(vocabularyTab, vocabularyTabBody));
+    // Load vocabulary data on vocabulary tab click
+    vocabularyTab.addEventListener('click', () => {
+      switchTab(vocabularyTab, vocabularyTabBody);
+      
+      // If the main.js is loaded, it will handle data loading via setupTabListeners
+      if (typeof loadVocabularyData === 'function' && !vocabularyData && !isLoading) {
+        loadVocabularyData();
+      }
+    });
+    
     fluencyTab.addEventListener('click', () => switchTab(fluencyTab, fluencyTabBody));
     
     // Initialize - hide non-selected tab bodies
