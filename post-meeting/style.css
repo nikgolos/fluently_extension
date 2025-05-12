@@ -523,48 +523,7 @@ h1 {
   align-items: center;
   justify-content: flex-start;
 }
-._120 {
-  color: var(--text-grey, #5f6367);
-  text-align: left;
-  font-family: "Roboto-Regular", sans-serif;
-  font-size: 11px;
-  line-height: 14px;
-  font-weight: 400;
-  position: absolute;
-  left: 70px;
-  top: 0px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-.normal {
-  color: var(--text-grey, #5f6367);
-  text-align: left;
-  font-family: "Roboto-Regular", sans-serif;
-  font-size: 11px;
-  line-height: 14px;
-  font-weight: 400;
-  position: absolute;
-  left: 122px;
-  top: -0.16px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-.fast {
-  color: var(--text-grey, #5f6367);
-  text-align: left;
-  font-family: "Roboto-Regular", sans-serif;
-  font-size: 11px;
-  line-height: 14px;
-  font-weight: 400;
-  position: absolute;
-  left: 276px;
-  top: 0px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
+
 .boring2 {
   color: var(--text-grey, #5f6367);
   text-align: left;
@@ -1722,7 +1681,7 @@ h1 {
   line-height: var(--subheadline-regular-line-height, 14px);
   font-weight: var(--subheadline-regular-font-weight, 400);
   position: absolute;
-  left: 57px;
+  left: 69px;
   top: 0px;
   display: flex;
   align-items: center;
@@ -1740,7 +1699,7 @@ h1 {
   line-height: var(--subheadline-regular-line-height, 14px);
   font-weight: var(--subheadline-regular-font-weight, 400);
   position: absolute;
-  left: 139px;
+  left: 123px;
   top: 0px;
   display: flex;
   align-items: center;
@@ -1758,7 +1717,7 @@ h1 {
   line-height: var(--subheadline-regular-line-height, 14px);
   font-weight: var(--subheadline-regular-font-weight, 400);
   position: absolute;
-  left: 267px;
+  left: 275px;
   top: 0px;
   display: flex;
   align-items: center;
