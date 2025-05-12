@@ -982,6 +982,17 @@ function displayGeneralStats(data) {
                 paragraphElement.textContent = data.summary;
             }
         }
+        
+        // Position the triangle according to the user's score
+        const scoreIndicator = document.querySelector('.general-tab-body .pace-card .speed-scale .score-indicator');
+        if (scoreIndicator) {
+            // Calculate the position as a percentage of the scale width
+            const positionPercentage = Math.max(0, Math.min(100, englishScore)); // Ensure score is between 0 and 100
+            scoreIndicator.style.left = `${positionPercentage}%`;
+            // Center the indicator by shifting it back by half its width
+            scoreIndicator.style.transform = 'translateX(-50%)';
+            console.log(`Set score indicator to: ${positionPercentage}%`);
+        }
     } catch (error) {
         console.error('Error updating general stats UI:', error);
     }

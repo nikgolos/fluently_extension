@@ -167,6 +167,32 @@
    .grammar-tab-body, .vocabulary-tab-body, .fluency-tab-body {
        display: none;
    }
+
+   /* Styles for the score indicator */
+   .speed-scale {
+       position: relative; /* Ensure the indicator is positioned relative to the scale */
+       /* Add other existing styles for speed-scale if any */
+   }
+
+   .score-indicator {
+       position: absolute;
+       top: -10px; /* Adjust as needed to position above the scale line */
+       display: flex;
+       flex-direction: column;
+       align-items: center; /* Center items horizontally within the container */
+       /* transform: translateX(-50%); /* This will be handled by JS to center the whole block */
+   }
+
+   .score-indicator .header3 .boring {
+       /* Remove previous positioning if any, let flexbox handle it */
+       position: static; 
+       margin-bottom: 2px; /* Space between "You" text and triangle */
+   }
+
+   .score-indicator .polygon-1 {
+       /* Remove previous positioning if any, let flexbox handle it */
+       position: static; 
+   }
    </style>
   <title>Meeting Stats - Fluently</title>
   
@@ -280,11 +306,13 @@
             </div>
           </div>
           <div class="speed-scale">
-            <div class="header3">
-              <div class="boring">You</div>
+            <div class="score-indicator">
+              <div class="header3">
+                <div class="boring">You</div>
+              </div>
+              <img class="polygon-1" src="post-meeting/src/polygon-10.svg" />
             </div>
             <img class="scale" src="post-meeting/src/scale0.svg" />
-            <img class="polygon-1" src="post-meeting/src/polygon-10.svg" />
             <div class="bottom">
               <div class="_150">65</div>
               <div class="_120">35</div>
@@ -387,11 +415,13 @@
             </div>
           </div>
           <div class="speed-scale">
-            <div class="header3">
-              <div class="boring">You</div>
+            <div class="score-indicator">
+              <div class="header3">
+                <div class="boring">You</div>
+              </div>
+              <img class="polygon-1" src="post-meeting/src/polygon-10.svg" />
             </div>
             <img class="scale" src="post-meeting/src/scale0.svg" />
-            <img class="polygon-1" src="post-meeting/src/polygon-10.svg" />
             <div class="bottom">
               <div class="_150">150</div>
               <div class="_120">120</div>
