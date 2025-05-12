@@ -692,6 +692,9 @@ h1 {
   flex-shrink: 0;
   position: relative;
 }
+.grammar-header, .general-header, .vocabulary-header, .fluency-header {
+  margin-bottom: 14px;
+}
 .grammar-header {
   display: flex;
   flex-direction: column;
