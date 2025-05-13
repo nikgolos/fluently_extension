@@ -1173,6 +1173,36 @@ function displayFluencyData(stats) {
         console.log(`Positioned Fluency WPM indicator for actualWpm ${actualWpm} at left: ${leftPositionPx}px`);
     }
 
+    // Update the Fluency tab paragraph based on useless words percentage and WPM
+    const fluencyParagraph = document.querySelector('.fluency-tab-body .header .paragraph');
+    if (fluencyParagraph) {
+        let paragraphText = '';
+        
+        // Determine text based on combination of garbage percentage and WPM
+        if (garbagePercentage > 10) {
+            if (actualWpm >= 100 && actualWpm <= 150) {
+                paragraphText = "Try to use less useless words next time";
+            } else if (actualWpm > 150) {
+                paragraphText = "Try to use less useless words and speak a bit slower next time";
+            } else { // WPM < 100
+                paragraphText = "Try to use less useless words and speak a bit faster next time";
+            }
+        } else { // garbagePercentage <= 10
+            if (actualWpm >= 100 && actualWpm <= 150) {
+                paragraphText = "You demonstrated great fluency skills!";
+            } else if (actualWpm > 150) {
+                paragraphText = "Try to speak a bit slower next time";
+            } else { // WPM < 100
+                paragraphText = "Try to speak a bit faster next time";
+            }
+        }
+        
+        fluencyParagraph.textContent = paragraphText;
+        console.log(`Updated Fluency tab paragraph to: "${paragraphText}"`);
+    } else {
+        console.error("Fluency paragraph element not found with selector: .fluency-tab-body .header .paragraph");
+    }
+
     // TODO: Display other fluency stats like filler words, histogram
 }
 
