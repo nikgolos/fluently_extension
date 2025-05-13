@@ -1067,9 +1067,34 @@ function displayFluencyData(stats) {
         return;
     }
 
-    // Update the useless words count display
-    const uselessWordsCount = (stats.garbage_words && stats.garbage_words.totalGarbageWords) || 0;
-    console.log(`Total useless words from transcript_stats.js: ${uselessWordsCount}`);
+    // Calculate useless words count, excluding words that appear only once
+    let uselessWordsCount = 0;
+    let totalWords = stats.total_words || 100; // Fallback to avoid division by zero
+    
+    // Check if we have garbage words data
+    if (stats.garbage_words && stats.garbage_words.topGarbageWords) {
+        // Filter and count only words that appear more than once
+        const topGarbageWords = stats.garbage_words.topGarbageWords;
+        
+        // Loop through all top garbage words
+        for (const word in topGarbageWords) {
+            const count = topGarbageWords[word];
+            // Only count words that appear more than once
+            if (count > 1) {
+                uselessWordsCount += count;
+            }
+        }
+        
+        console.log(`Recalculated useless words count (excluding single occurrences): ${uselessWordsCount}`);
+    } else {
+        // Fallback to the total if topGarbageWords not available
+        uselessWordsCount = (stats.garbage_words && stats.garbage_words.totalGarbageWords) || 0;
+        console.log(`Using original totalGarbageWords as fallback: ${uselessWordsCount}`);
+    }
+    
+    // Calculate the adjusted percentage
+    const garbagePercentage = totalWords > 0 ? Math.round((uselessWordsCount / totalWords) * 100) : 0;
+    console.log(`Recalculated garbage percentage: ${garbagePercentage}%`);
     
     const uselessWordsElement = document.querySelector('.fluency-tab-body .fillers-card .text-section .h-3-header');
     if (uselessWordsElement) {
@@ -1080,9 +1105,6 @@ function displayFluencyData(stats) {
     }
     
     // Update the garbage percentage text with dynamic label based on percentage
-    const garbagePercentage = (stats.garbage_words && stats.garbage_words.garbagePercentage) || 0;
-    console.log(`Garbage percentage from transcript_stats.js: ${garbagePercentage}%`);
-    
     const uselessWordsPercentText = document.querySelector('.fluency-tab-body .fillers-card .text-section .text');
     if (uselessWordsPercentText) {
         // Determine label class and text based on the garbage percentage

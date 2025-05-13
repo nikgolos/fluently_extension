@@ -589,7 +589,7 @@ function calculateGarbageWordStats(text) {
         
         // Add individual words from 'others' category that meet the threshold
         const othersWordsArray = Object.entries(garbageWordsCount.uniqueGarbage)
-          .filter(([word, count]) => count >= 3) // Only include words with frequency >= 3
+          .filter(([word, count]) => count >= 2) // Only include words with frequency >= 3
           .sort((a, b) => b[1] - a[1]); // Sort by count (descending)
         
         // Take the top 3 words from 'others' category
