@@ -1225,7 +1225,119 @@ function displayFluencyData(stats) {
         console.error("Fluency paragraph element not found with selector: .fluency-tab-body .header .paragraph");
     }
 
-    // TODO: Display other fluency stats like filler words, histogram
+    // Update the histogram with top garbage words
+    const histogramContainer = document.querySelector('.fluency-tab-body .fillers-card .histogram');
+    if (histogramContainer) {
+        // Clear the existing histogram content
+        histogramContainer.innerHTML = '';
+        
+        // Check if we have garbage words data
+        if (stats.garbage_words && stats.garbage_words.topGarbageWords) {
+            const topGarbageWords = stats.garbage_words.topGarbageWords;
+            
+            // Convert the object to an array of [word, count] pairs
+            const wordArray = Object.entries(topGarbageWords);
+            
+            // Sort by count (descending)
+            wordArray.sort((a, b) => b[1] - a[1]);
+            
+            // Take top 3 words (or fewer if less than 3 exist)
+            const topWords = wordArray.slice(0, 3);
+            
+            console.log(`Top ${topWords.length} garbage words:`, topWords);
+            
+            if (topWords.length > 0) {
+                // Calculate total count for all displayed words to determine relative widths
+                const totalCount = topWords.reduce((sum, [_, count]) => sum + count, 0);
+                console.log(`Total count of top garbage words: ${totalCount}`);
+                
+                // Create histogram blocks for each top word
+                topWords.forEach((wordPair, index) => {
+                    const [word, count] = wordPair;
+                    
+                    // Calculate width percentage based on relative frequency
+                    const widthPercentage = topWords.length === 1 ? 100 : Math.round((count / totalCount) * 100);
+                    console.log(`Word "${word}" count: ${count}, width: ${widthPercentage}%`);
+                    
+                    // Create histogram block
+                    const histogramBlock = document.createElement('div');
+                    histogramBlock.className = 'histogram-block';
+                    
+                    // Create filler bar (with different heights based on index)
+                    const fillerBar = document.createElement('div');
+                    fillerBar.className = index === 0 ? 'filler' : 'filler2';
+                    fillerBar.style.width = `${widthPercentage}%`; // Set the width based on relative frequency
+                    
+                    // Create content container
+                    const fillerContent = document.createElement('div');
+                    fillerContent.className = 'filler-content';
+                    
+                    // Create word text
+                    const supportingText = document.createElement('div');
+                    supportingText.className = 'supporting-text';
+                    supportingText.textContent = `"${word}"`;
+                    
+                    // Create count text
+                    const supportingText2 = document.createElement('div');
+                    supportingText2.className = 'supporting-text2';
+                    supportingText2.textContent = `said ${count} ${count === 1 ? 'time' : 'times'}`;
+                    
+                    // Assemble the elements
+                    fillerContent.appendChild(supportingText);
+                    fillerContent.appendChild(supportingText2);
+                    histogramBlock.appendChild(fillerBar);
+                    histogramBlock.appendChild(fillerContent);
+                    
+                    // Add to container
+                    histogramContainer.appendChild(histogramBlock);
+                });
+            } else {
+                // Create a single block with message if no garbage words
+                const histogramBlock = document.createElement('div');
+                histogramBlock.className = 'histogram-block';
+                
+                const fillerBar = document.createElement('div');
+                fillerBar.className = 'filler';
+                // Remove custom height to match regular histogram bars
+                fillerBar.style.width = '100%';  // Full width for single message
+                
+                const fillerContent = document.createElement('div');
+                fillerContent.className = 'filler-content';
+                
+                const supportingText = document.createElement('div');
+                supportingText.className = 'supporting-text';
+                supportingText.textContent = ''; // Empty string instead of "..."
+                
+                const supportingText2 = document.createElement('div');
+                supportingText2.className = 'supporting-text2';
+                supportingText2.textContent = 'No garbage words to show';
+                
+                fillerContent.appendChild(supportingText);
+                fillerContent.appendChild(supportingText2);
+                histogramBlock.appendChild(fillerBar);
+                histogramBlock.appendChild(fillerContent);
+                
+                histogramContainer.appendChild(histogramBlock);
+            }
+            
+            console.log('Updated histogram with dynamic garbage word data and proportional widths');
+        } else {
+            // Fallback if no topGarbageWords data
+            histogramContainer.innerHTML = `
+                <div class="histogram-block">
+                    <div class="filler" style="width: 100%;"></div>
+                    <div class="filler-content">
+                        <div class="supporting-text">No garbage words data</div>
+                    </div>
+                </div>
+            `;
+            console.warn('No topGarbageWords data available for histogram');
+        }
+    } else {
+        console.error("Histogram container not found with selector: .fluency-tab-body .fillers-card .histogram");
+    }
+
+    // TODO: Display other fluency stats
 }
 
 // Initialize when the page loads
