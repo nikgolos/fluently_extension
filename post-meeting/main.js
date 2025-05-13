@@ -1225,6 +1225,38 @@ function displayFluencyData(stats) {
         console.error("Fluency paragraph element not found with selector: .fluency-tab-body .header .paragraph");
     }
 
+    // Calculate fluency mistakes count for badge
+    let fluencyMistakesCount = 0;
+    const hasWpmIssue = actualWpm < 100 || actualWpm > 150;
+    const hasGarbageIssue = garbagePercentage > 10;
+    
+    if (hasWpmIssue && hasGarbageIssue) {
+        fluencyMistakesCount = 2; // Both conditions are true
+    } else if (hasWpmIssue || hasGarbageIssue) {
+        fluencyMistakesCount = 1; // Only one condition is true
+    } // else fluencyMistakesCount remains 0
+    
+    console.log(`Fluency mistakes count: ${fluencyMistakesCount} (WPM issue: ${hasWpmIssue}, Garbage issue: ${hasGarbageIssue})`);
+    
+    // Update the Fluency tab badge
+    const fluencyBadge = document.querySelector('.fluency-tab .badge-label');
+    if (fluencyBadge) {
+        fluencyBadge.textContent = fluencyMistakesCount;
+        
+        // Update badge color based on count
+        const badgeContainer = fluencyBadge.parentElement;
+        if (fluencyMistakesCount > 0) {
+            badgeContainer.classList.remove('badge-green');
+            badgeContainer.classList.add('badge-red');
+        } else {
+            badgeContainer.classList.remove('badge-red');
+            badgeContainer.classList.add('badge-green');
+        }
+        console.log(`Updated Fluency tab badge to ${fluencyMistakesCount} mistakes`);
+    } else {
+        console.error("Fluency badge element not found with selector: .fluency-tab .badge-label");
+    }
+
     // Update the histogram with top garbage words
     const histogramContainer = document.querySelector('.fluency-tab-body .fillers-card .histogram');
     if (histogramContainer) {
