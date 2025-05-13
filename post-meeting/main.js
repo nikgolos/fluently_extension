@@ -982,6 +982,17 @@ function displayGeneralStats(data) {
                 paragraphElement.textContent = data.summary;
             }
         }
+
+        // Update the feedback text in the pace card
+        const feedbackTextElement = document.querySelector('.pace-card .text .reduce-the-number-of-filler-words-and-expand-your-vocabulary-to-achieve-a-better-score');
+        if (feedbackTextElement) {
+            if (data.feedback && data.feedback.trim() !== '') {
+                feedbackTextElement.textContent = data.feedback;
+            } else {
+                // Fallback text if feedback is not provided or is empty
+                feedbackTextElement.textContent = 'Review your detailed stats in other tabs to see how you can improve.';
+            }
+        }
         
         // Position the triangle according to the user's score
         const scoreIndicator = document.querySelector('.general-tab-body .pace-card .speed-scale .score-indicator');
