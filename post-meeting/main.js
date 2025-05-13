@@ -233,7 +233,7 @@ async function loadGrammarData() {
         // Show loading indicator in grammar cards section
         const grammarCards = document.querySelector('.grammar-cards');
         if (grammarCards) {
-            grammarCards.innerHTML = '<div class="loading">Loading grammar analysis...</div>';
+        grammarCards.innerHTML = '<div class="loading">Loading grammar analysis...</div>';
         }
         
         // Strip timestamps before sending to API
@@ -259,7 +259,7 @@ async function loadGrammarData() {
         console.error('Error loading grammar data:', error);
         const grammarCards = document.querySelector('.grammar-cards');
         if (grammarCards) {
-            grammarCards.innerHTML = '<div class="error">Error loading grammar analysis. Please try again.</div>';
+        grammarCards.innerHTML = '<div class="error">Error loading grammar analysis. Please try again.</div>';
         }
         hideTabLoader('.grammar-tab-body');
         isLoading = false;
@@ -420,7 +420,7 @@ async function loadVocabularyData() {
         // Show loading indicator in vocabulary cards section
         const vocabularyCards = document.querySelector('.vocabulary-cards');
         if (vocabularyCards) {
-            vocabularyCards.innerHTML = '<div class="loading">Loading vocabulary analysis...</div>';
+        vocabularyCards.innerHTML = '<div class="loading">Loading vocabulary analysis...</div>';
         }
         
         // Strip timestamps before sending to API
@@ -446,7 +446,7 @@ async function loadVocabularyData() {
         console.error('Error loading vocabulary data:', error);
         const vocabularyCards = document.querySelector('.vocabulary-cards');
         if (vocabularyCards) {
-            vocabularyCards.innerHTML = '<div class="error">Error loading vocabulary analysis. Please try again.</div>';
+        vocabularyCards.innerHTML = '<div class="error">Error loading vocabulary analysis. Please try again.</div>';
         }
         hideTabLoader('.vocabulary-tab-body');
         isLoading = false;
@@ -1067,11 +1067,11 @@ function displayFluencyData(stats) {
         return;
     }
 
-    // Update Words Per Minute text display
+    // Update Words Per Minute text display (for "You said X words per min")
     let wpmForDisplay = stats.words_per_minute || 0;
-    console.log(`Original WPM from transcript_stats.js: ${wpmForDisplay}`);
+    console.log(`Original WPM from transcript_stats.js (for text display calculation): ${wpmForDisplay}`);
     wpmForDisplay = wpmForDisplay * 1.12; // Increase by 12%
-    console.log(`WPM after 12% increase: ${wpmForDisplay}`);
+    console.log(`WPM after 12% increase (for text display): ${wpmForDisplay}`);
     wpmForDisplay = Math.round(wpmForDisplay); // Round to nearest whole number
     console.log(`Final rounded WPM for text display: ${wpmForDisplay}`);
     
@@ -1081,8 +1081,40 @@ function displayFluencyData(stats) {
         console.log(`Updated Fluency WPM text display to: ${wpmForDisplay}`);
     }
 
-    // Position the WPM scale indicator
+    // Use actualWpm for conditional feedback and scale positioning
     const actualWpm = stats.words_per_minute || 0;
+    console.log(`Actual WPM for feedback and scale: ${actualWpm}`);
+
+    // Update WPM feedback label and text
+    const wpmLabelElement = document.querySelector('.fluency-tab-body .pace-card .text-section .text > span:first-child');
+    const wpmFeedbackTextElement = document.querySelector('#wpm-feedback');
+
+    if (wpmLabelElement && wpmFeedbackTextElement) {
+        // Clear existing color classes
+        wpmLabelElement.classList.remove('red-label', 'green-label');
+
+        if (actualWpm < 100) {
+            wpmLabelElement.textContent = "Speed up!";
+            wpmLabelElement.classList.add('red-label');
+            wpmFeedbackTextElement.textContent = "It's slower than recommended";
+            console.log("WPM < 100: Applied 'Speed up!' feedback.");
+        } else if (actualWpm >= 100 && actualWpm <= 150) {
+            wpmLabelElement.textContent = "Amazing!";
+            wpmLabelElement.classList.add('green-label');
+            wpmFeedbackTextElement.textContent = "It is just in recommended level";
+            console.log("WPM 100-150: Applied 'Amazing!' feedback.");
+        } else { // actualWpm > 150
+            wpmLabelElement.textContent = "Slow down!";
+            wpmLabelElement.classList.add('red-label');
+            wpmFeedbackTextElement.textContent = "It's faster than recommended";
+            console.log("WPM > 150: Applied 'Slow down!' feedback.");
+        }
+    } else {
+        if (!wpmLabelElement) console.error("WPM Label element (span for 'Hold on!', 'Speed up!') not found with selector: .fluency-tab-body .pace-card .text-section .text > span:first-child");
+        if (!wpmFeedbackTextElement) console.error("WPM Feedback text element (#wpm-feedback) not found.");
+    }
+
+    // Position the WPM scale indicator
     const wpmScoreIndicator = document.querySelector('.fluency-tab-body .pace-card .speed-scale .score-indicator');
     
     if (wpmScoreIndicator) {

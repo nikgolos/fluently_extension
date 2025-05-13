@@ -695,7 +695,7 @@ h1 {
 .text-section {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   align-items: flex-start;
   justify-content: flex-start;
   align-self: stretch;
@@ -1379,18 +1379,6 @@ h1 {
   align-items: center;
   justify-content: flex-start;
 }
-.text {
-  display: flex;
-  flex-direction: row;
-  gap: 4px;
-  align-items: flex-start;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  align-content: flex-start;
-  align-self: stretch;
-  flex-shrink: 0;
-  position: relative;
-}
 .colored-label {
   display: flex;
   flex-direction: row;
@@ -1400,30 +1388,19 @@ h1 {
   flex-shrink: 0;
   position: relative;
 }
-.red-label {
-  display: flex;
-  flex-direction: row;
-  gap: 0px;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  position: relative;
+.green-label {
+  color: var(--green, #2dad14);
 }
-.great-job {
+.red-label {
   color: var(--red, #ea4335);
+}
+.red-label, .green-label {
+  margin-right: 4px;
+  flex-shrink: 0;
   text-align: left;
-  font-family: var(
-    --body-small-strong-font-family,
-    "Inter-SemiBold",
-    sans-serif
-  );
   font-size: var(--body-small-strong-font-size, 14px);
   line-height: var(--body-small-strong-line-height, 140%);
   font-weight: var(--body-small-strong-font-weight, 600);
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
 }
 .that-is-4-of-your-speech {
   color: var(--text-grey, #5f6367);
@@ -1587,7 +1564,7 @@ h1 {
   align-items: center;
   justify-content: flex-start;
 }
-.it-s-faster-than-the-recommended-level {
+.text {
   color: var(--text-grey, #5f6367);
   text-align: left;
   font-family: var(--m3-body-medium-font-family, "Roboto-Regular", sans-serif);
