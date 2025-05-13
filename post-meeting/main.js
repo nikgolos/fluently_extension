@@ -1067,6 +1067,35 @@ function displayFluencyData(stats) {
         return;
     }
 
+    // Update the useless words count display
+    const uselessWordsCount = (stats.garbage_words && stats.garbage_words.totalGarbageWords) || 0;
+    console.log(`Total useless words from transcript_stats.js: ${uselessWordsCount}`);
+    
+    const uselessWordsElement = document.querySelector('.fluency-tab-body .fillers-card .text-section .h-3-header');
+    if (uselessWordsElement) {
+        uselessWordsElement.textContent = `You used ${uselessWordsCount} useless words`;
+        console.log(`Updated useless words count display to: ${uselessWordsCount}`);
+    } else {
+        console.error("Useless words element not found with selector: .fluency-tab-body .fillers-card .text-section .h-3-header");
+    }
+    
+    // Update the garbage percentage text with dynamic label based on percentage
+    const garbagePercentage = (stats.garbage_words && stats.garbage_words.garbagePercentage) || 0;
+    console.log(`Garbage percentage from transcript_stats.js: ${garbagePercentage}%`);
+    
+    const uselessWordsPercentText = document.querySelector('.fluency-tab-body .fillers-card .text-section .text');
+    if (uselessWordsPercentText) {
+        // Determine label class and text based on the garbage percentage
+        let labelClass = garbagePercentage <= 10 ? 'green-label' : 'red-label';
+        let labelText = garbagePercentage <= 10 ? 'Great done!' : 'Too much!';
+        
+        // Create the new HTML content
+        uselessWordsPercentText.innerHTML = `<span class="${labelClass}">${labelText}</span> That is ${garbagePercentage}% of your speech`;
+        console.log(`Updated useless words percentage to: ${garbagePercentage}% with label: ${labelText}`);
+    } else {
+        console.error("Useless words percentage element not found with selector: .fluency-tab-body .fillers-card .text-section .text");
+    }
+
     // Update Words Per Minute text display (for "You said X words per min")
     let wpmForDisplay = stats.words_per_minute || 0;
     console.log(`Original WPM from transcript_stats.js (for text display calculation): ${wpmForDisplay}`);
