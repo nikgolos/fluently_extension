@@ -3,9 +3,11 @@
 
 // Global variables for storing data
 let transcriptText = '';
+let transcriptId = null; // Store transcriptId globally
 let grammarData = null;
 let vocabularyData = null;
 let statsData = null;
+let frontendStats = null; // Store frontend calculated stats
 let isLoading = false;
 
 // Initialize the application
@@ -13,7 +15,7 @@ async function initApp() {
     try {
         // Get transcript ID from the URL query parameter
         const urlParams = new URLSearchParams(window.location.search);
-        const transcriptId = urlParams.get('id');
+        transcriptId = urlParams.get('id'); // Assign to global transcriptId
         
         if (!transcriptId) {
             throw new Error('No transcript ID provided in URL');
@@ -34,11 +36,15 @@ async function initApp() {
         // Add event listeners to tabs
         setupTabListeners();
         
-        // Load stats for General tab first
+        // Load stats for General tab (API based)
         await loadGeneralStats();
         
-        // Initialize grammar tab with data from API
-        await loadGrammarData();
+        // Calculate and display frontend-based stats (including Fluency)
+        await loadAndDisplayFrontendStats();
+        
+        // Initialize grammar tab with data from API (can run in parallel or after)
+        loadGrammarData(); // No await, let it load in background
+        
     } catch (error) {
         console.error('Error initializing app:', error);
         
@@ -1004,9 +1010,75 @@ function displayGeneralStats(data) {
             scoreIndicator.style.transform = 'translateX(-50%)';
             console.log(`Set score indicator to: ${positionPercentage}%`);
         }
+
     } catch (error) {
         console.error('Error updating general stats UI:', error);
     }
+}
+
+// Function to load and display stats calculated by transcript_stats.js
+async function loadAndDisplayFrontendStats() {
+    if (typeof calculateTranscriptStats === 'function') {
+        console.log("Calculating frontend stats...");
+        try {
+            // Show loader in Fluency tab while calculating
+            showTabLoader('.fluency-tab-body .fluency-cards');
+            
+            const transcriptObject = {
+                id: transcriptId, 
+                text: transcriptText,
+                sessionId: transcriptId // Assuming sessionId is same as id for this context
+            };
+            frontendStats = await calculateTranscriptStats(transcriptObject); // capture the result
+            console.log("Frontend stats calculated:", frontendStats);
+            
+            displayFluencyData(frontendStats);
+            
+            hideTabLoader('.fluency-tab-body .fluency-cards');
+        } catch (error) {
+            console.error("Error calculating frontend stats:", error);
+            hideTabLoader('.fluency-tab-body .fluency-cards');
+            // Optionally display an error in the fluency tab
+            const fluencyCards = document.querySelector('.fluency-tab-body .fluency-cards');
+            if (fluencyCards) {
+                fluencyCards.innerHTML = '<div class="error">Error calculating fluency stats.</div>';
+            }
+        }
+    } else {
+        console.error('calculateTranscriptStats function not found. Is transcript_stats.js loaded?');
+        const fluencyCards = document.querySelector('.fluency-tab-body .fluency-cards');
+        if (fluencyCards) {
+            fluencyCards.innerHTML = '<div class="error">Fluency analysis unavailable. Script error.</div>';
+        }
+    }
+}
+
+// Function to display fluency data in the UI
+function displayFluencyData(stats) {
+    if (!stats) {
+        console.error("No frontend stats provided to displayFluencyData");
+        return;
+    }
+
+    // Update Words Per Minute in Fluency Tab
+    let wpm = stats.words_per_minute || 0;
+    console.log(`Original WPM from transcript_stats.js: ${wpm}`);
+    
+    // Increase WPM by 12%
+    wpm = wpm * 1.12;
+    console.log(`WPM after 12% increase: ${wpm}`);
+    
+    // Round to the nearest whole number
+    wpm = Math.round(wpm);
+    console.log(`Final rounded WPM for display: ${wpm}`);
+    
+    const wpmElement = document.querySelector('.fluency-tab-body .pace-card .text-section .h-3-header2');
+    if (wpmElement) {
+        wpmElement.textContent = `You said ${wpm} words per min`;
+        console.log(`Updated Fluency WPM display to: ${wpm}`);
+    }
+
+    // TODO: Display other fluency stats like filler words, histogram, pace scale indicator
 }
 
 // Initialize when the page loads
