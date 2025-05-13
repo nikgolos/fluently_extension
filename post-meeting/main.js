@@ -36,14 +36,21 @@ async function initApp() {
         // Add event listeners to tabs
         setupTabListeners();
         
-        // Load stats for General tab (API based)
-        await loadGeneralStats();
-        
-        // Calculate and display frontend-based stats (including Fluency)
+        // --- REORDERED OPERATIONS START ---
+        // 1. Calculate and display frontend-based stats (including Fluency)
+        console.log("Starting frontend stats calculation...");
         await loadAndDisplayFrontendStats();
+        console.log("Frontend stats calculation complete.");
         
-        // Initialize grammar tab with data from API (can run in parallel or after)
+        // 2. Load stats for General tab (API based)
+        console.log("Starting General tab API stats loading...");
+        await loadGeneralStats();
+        console.log("General tab API stats loading complete.");
+        
+        // 3. Initialize grammar tab with data from API (can run in background or be awaited)
+        console.log("Starting Grammar tab API data loading (non-blocking)...");
         loadGrammarData(); // No await, let it load in background
+        // --- REORDERED OPERATIONS END ---
         
     } catch (error) {
         console.error('Error initializing app:', error);
@@ -1060,25 +1067,52 @@ function displayFluencyData(stats) {
         return;
     }
 
-    // Update Words Per Minute in Fluency Tab
-    let wpm = stats.words_per_minute || 0;
-    console.log(`Original WPM from transcript_stats.js: ${wpm}`);
+    // Update Words Per Minute text display
+    let wpmForDisplay = stats.words_per_minute || 0;
+    console.log(`Original WPM from transcript_stats.js: ${wpmForDisplay}`);
+    wpmForDisplay = wpmForDisplay * 1.12; // Increase by 12%
+    console.log(`WPM after 12% increase: ${wpmForDisplay}`);
+    wpmForDisplay = Math.round(wpmForDisplay); // Round to nearest whole number
+    console.log(`Final rounded WPM for text display: ${wpmForDisplay}`);
     
-    // Increase WPM by 12%
-    wpm = wpm * 1.12;
-    console.log(`WPM after 12% increase: ${wpm}`);
-    
-    // Round to the nearest whole number
-    wpm = Math.round(wpm);
-    console.log(`Final rounded WPM for display: ${wpm}`);
-    
-    const wpmElement = document.querySelector('.fluency-tab-body .pace-card .text-section .h-3-header2');
-    if (wpmElement) {
-        wpmElement.textContent = `You said ${wpm} words per min`;
-        console.log(`Updated Fluency WPM display to: ${wpm}`);
+    const wpmTextElement = document.querySelector('.fluency-tab-body .pace-card .text-section .h-3-header2');
+    if (wpmTextElement) {
+        wpmTextElement.textContent = `You said ${wpmForDisplay} words per min`;
+        console.log(`Updated Fluency WPM text display to: ${wpmForDisplay}`);
     }
 
-    // TODO: Display other fluency stats like filler words, histogram, pace scale indicator
+    // Position the WPM scale indicator
+    const actualWpm = stats.words_per_minute || 0;
+    const wpmScoreIndicator = document.querySelector('.fluency-tab-body .pace-card .speed-scale .score-indicator');
+    
+    if (wpmScoreIndicator) {
+        const scaleMinWpm = 45;
+        const scaleMaxWpm = 195;
+        const indicatorMinLeftPx = 4;
+        const indicatorMaxLeftPx = 304;
+
+        let leftPositionPx;
+
+        if (actualWpm <= scaleMinWpm) {
+            leftPositionPx = indicatorMinLeftPx;
+        } else if (actualWpm >= scaleMaxWpm) {
+            leftPositionPx = indicatorMaxLeftPx;
+        } else {
+            const wpmRange = scaleMaxWpm - scaleMinWpm; // 150
+            const pixelRange = indicatorMaxLeftPx - indicatorMinLeftPx; // 300
+            const wpmOffset = actualWpm - scaleMinWpm;
+            leftPositionPx = indicatorMinLeftPx + (wpmOffset / wpmRange) * pixelRange;
+        }
+        
+        // Ensure position is within bounds, just in case calculations go slightly off
+        leftPositionPx = Math.max(indicatorMinLeftPx, Math.min(indicatorMaxLeftPx, leftPositionPx));
+
+        wpmScoreIndicator.style.left = `${leftPositionPx}px`;
+        wpmScoreIndicator.style.transform = 'translateX(-50%)';
+        console.log(`Positioned Fluency WPM indicator for actualWpm ${actualWpm} at left: ${leftPositionPx}px`);
+    }
+
+    // TODO: Display other fluency stats like filler words, histogram
 }
 
 // Initialize when the page loads

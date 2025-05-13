@@ -631,7 +631,7 @@ h1 {
   flex-shrink: 0;
   position: relative;
 }
-.grammar-header, .general-header, .vocabulary-header, .fluency-header {
+.grammar-header, .general-header, .vocabulary-header, .header {
   margin-bottom: 14px;
 }
 .grammar-header {
