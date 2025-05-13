@@ -1651,23 +1651,21 @@ h1 {
   position: relative;
   overflow: hidden;
 }
-._150 {
-  color: var(--text-grey, #5f6367);
-  text-align: left;
-  font-family: var(
-    --subheadline-regular-font-family,
-    "SfPro-Regular",
-    sans-serif
-  );
-  font-size: var(--subheadline-regular-font-size, 11px);
-  line-height: var(--subheadline-regular-line-height, 14px);
-  font-weight: var(--subheadline-regular-font-weight, 400);
-  position: absolute;
-  left: 225px;
-  top: 0px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
+
+#fluency-100 {
+  left: 76px;
+}
+#fluency-150 {
+  left: 212px;
+}
+#fluency-normal {
+  left: 133px;
+}
+#fluency-fast {
+  left: 269px;
+}
+#fluency-slow {
+  left: 0px;
 }
 ._120 {
   color: var(--text-grey, #5f6367);
@@ -1681,7 +1679,7 @@ h1 {
   line-height: var(--subheadline-regular-line-height, 14px);
   font-weight: var(--subheadline-regular-font-weight, 400);
   position: absolute;
-  left: 69px;
+  left: 70px;
   top: 0px;
   display: flex;
   align-items: center;
@@ -1718,24 +1716,6 @@ h1 {
   font-weight: var(--subheadline-regular-font-weight, 400);
   position: absolute;
   left: 275px;
-  top: 0px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-}
-.boring2 {
-  color: var(--text-grey, #5f6367);
-  text-align: left;
-  font-family: var(
-    --subheadline-regular-font-family,
-    "SfPro-Regular",
-    sans-serif
-  );
-  font-size: var(--subheadline-regular-font-size, 11px);
-  line-height: var(--subheadline-regular-line-height, 14px);
-  font-weight: var(--subheadline-regular-font-weight, 400);
-  position: absolute;
-  left: 0px;
   top: 0px;
   display: flex;
   align-items: center;
