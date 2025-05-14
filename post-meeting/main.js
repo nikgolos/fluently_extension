@@ -92,14 +92,15 @@ async function initApp() {
         await loadAndDisplayFrontendStats();
         console.log("Frontend stats calculation complete.");
         
-        // 2. Load stats for General tab (API based)
-        console.log("Starting General tab API stats loading...");
+        // 2. Load stats for General tab (API based) - this includes /english_stats
+        console.log("Starting General tab API stats loading (/english_stats)...");
         await loadGeneralStats();
         console.log("General tab API stats loading complete.");
         
-        // 3. Initialize grammar tab with data from API (can run in background or be awaited)
-        console.log("Starting Grammar tab API data loading (non-blocking)...");
-        loadGrammarData(); // No await, let it load in background
+        // 3. Initialize Grammar and Vocabulary tabs by starting their data load (non-blocking)
+        console.log("Starting Grammar and Vocabulary tab API data loading (non-blocking)...");
+        loadGrammarData();    // Initiate Grammar API call
+        loadVocabularyData(); // Initiate Vocabulary API call
         // --- REORDERED OPERATIONS END ---
         
     } catch (error) {
@@ -258,6 +259,54 @@ function setupTabListeners() {
     const grammarTab = document.querySelector('.grammar-tab');
     const vocabularyTab = document.querySelector('.vocabulary-tab');
     
+    // Make badges transparent initially until data loads
+    const grammarBadge = document.querySelector('.grammar-tab .badge-red, .grammar-tab .badge-green');
+    const vocabularyBadge = document.querySelector('.vocabulary-tab .badge-red, .vocabulary-tab .badge-green');
+    
+    if (grammarBadge) {
+        grammarBadge.style.opacity = '1'; // Keep visible but replace content with loader
+        grammarBadge.style.backgroundColor = 'transparent'; // Make background transparent
+        const badgeLabel = grammarBadge.querySelector('.badge-label');
+        if (badgeLabel) {
+            // Store original text
+            badgeLabel._originalText = badgeLabel.textContent;
+            // Replace with small loader
+            badgeLabel.innerHTML = '<div class="mini-loader"></div>';
+        }
+    }
+    
+    if (vocabularyBadge) {
+        vocabularyBadge.style.opacity = '1'; // Keep visible but replace content with loader
+        vocabularyBadge.style.backgroundColor = 'transparent'; // Make background transparent
+        const badgeLabel = vocabularyBadge.querySelector('.badge-label');
+        if (badgeLabel) {
+            // Store original text
+            badgeLabel._originalText = badgeLabel.textContent;
+            // Replace with small loader
+            badgeLabel.innerHTML = '<div class="mini-loader"></div>';
+        }
+    }
+    
+    // Add CSS for mini-loader if not already present
+    if (!document.getElementById('mini-loader-style')) {
+        const style = document.createElement('style');
+        style.id = 'mini-loader-style';
+        style.textContent = `
+            .mini-loader {
+                width: 8px;
+                height: 8px;
+                border: 2px solid rgba(9, 87, 208, 0.3);
+                border-radius: 50%;
+                border-top-color: var(--blue, #0957d0);
+                animation: mini-spin 1s linear infinite;
+            }
+            @keyframes mini-spin {
+                to {transform: rotate(360deg);}
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
     // Add click listener to grammar tab to ensure data is loaded
     grammarTab.addEventListener('click', async () => {
         if (!grammarData && !isLoading) {
@@ -279,12 +328,7 @@ async function loadGrammarData() {
         // Show loading state in grammar tab body
         showTabLoader('.grammar-tab-body');
         isLoading = true;
-        
-        // Show loading indicator in grammar cards section
-        const grammarCards = document.querySelector('.grammar-cards');
-        if (grammarCards) {
-        grammarCards.innerHTML = '<div class="loading">Loading grammar analysis...</div>';
-        }
+    
         
         // Strip timestamps before sending to API
         const cleanText = stripTimestamps(transcriptText);
@@ -307,11 +351,10 @@ async function loadGrammarData() {
         isLoading = false;
     } catch (error) {
         console.error('Error loading grammar data:', error);
-        const grammarCards = document.querySelector('.grammar-cards');
-        if (grammarCards) {
-        grammarCards.innerHTML = '<div class="error">Error loading grammar analysis. Please try again.</div>';
-        }
-        hideTabLoader('.grammar-tab-body');
+        // Keep showing the loader instead of error message if data failed to load
+        // grammarCards.innerHTML = '<div class="error">Error loading grammar analysis. Please try again.</div>';
+        
+        // Don't hide the loader to indicate we're still waiting for data
         isLoading = false;
     }
 }
@@ -432,7 +475,7 @@ function createGrammarError(mistake) {
 
 // Update grammar badge count
 function updateGrammarBadgeCount(count) {
-    const badge = document.querySelector('.grammar-tab .badge-green .badge-label');
+    const badge = document.querySelector('.grammar-tab .badge-green .badge-label, .grammar-tab .badge-red .badge-label');
     if (badge) {
         badge.textContent = count;
         
@@ -441,10 +484,14 @@ function updateGrammarBadgeCount(count) {
         if (count > 0) {
             badgeContainer.classList.remove('badge-green');
             badgeContainer.classList.add('badge-red');
+            badgeContainer.style.backgroundColor = ''; // Remove transparent background
         } else {
             badgeContainer.classList.remove('badge-red');
             badgeContainer.classList.add('badge-green');
+            badgeContainer.style.backgroundColor = ''; // Remove transparent background
         }
+        
+        console.log(`Updated grammar badge to ${count} with appropriate color`);
     }
 }
 
@@ -467,12 +514,6 @@ async function loadVocabularyData() {
         showTabLoader('.vocabulary-tab-body');
         isLoading = true;
         
-        // Show loading indicator in vocabulary cards section
-        const vocabularyCards = document.querySelector('.vocabulary-cards');
-        if (vocabularyCards) {
-        vocabularyCards.innerHTML = '<div class="loading">Loading vocabulary analysis...</div>';
-        }
-        
         // Strip timestamps before sending to API
         const cleanText = stripTimestamps(transcriptText);
         
@@ -494,11 +535,10 @@ async function loadVocabularyData() {
         isLoading = false;
     } catch (error) {
         console.error('Error loading vocabulary data:', error);
-        const vocabularyCards = document.querySelector('.vocabulary-cards');
-        if (vocabularyCards) {
-        vocabularyCards.innerHTML = '<div class="error">Error loading vocabulary analysis. Please try again.</div>';
-        }
-        hideTabLoader('.vocabulary-tab-body');
+        // Keep showing the loader instead of error message if data failed to load
+        // vocabularyCards.innerHTML = '<div class="error">Error loading vocabulary analysis. Please try again.</div>';
+        
+        // Don't hide the loader to indicate we're still waiting for data
         isLoading = false;
     }
 }
@@ -801,7 +841,7 @@ function createRephrasingCard(rephrasing) {
 
 // Update vocabulary badge count
 function updateVocabularyBadgeCount(count) {
-    const badge = document.querySelector('.vocabulary-tab .badge-red .badge-label');
+    const badge = document.querySelector('.vocabulary-tab .badge-green .badge-label, .vocabulary-tab .badge-red .badge-label');
     if (badge) {
         badge.textContent = count;
         
@@ -810,10 +850,14 @@ function updateVocabularyBadgeCount(count) {
         if (count > 0) {
             badgeContainer.classList.remove('badge-green');
             badgeContainer.classList.add('badge-red');
+            badgeContainer.style.backgroundColor = ''; // Remove transparent background
         } else {
             badgeContainer.classList.remove('badge-red');
             badgeContainer.classList.add('badge-green');
+            badgeContainer.style.backgroundColor = ''; // Remove transparent background
         }
+        
+        console.log(`Updated vocabulary badge to ${count} with appropriate color`);
     }
 }
 
@@ -926,13 +970,26 @@ async function copyToClipboard(text) {
 // Load general stats from API
 async function loadGeneralStats() {
     try {
-        // Store the original content of the general tab
         const generalTabBody = document.querySelector('.general-tab-body');
-        const originalContent = generalTabBody.innerHTML;
+        const generalHeader = generalTabBody.querySelector('.general-header'); // Preserve header
+        const generalCardsContainer = generalTabBody.querySelector('.general-cards'); // Target for loader
+
+        let originalCardsContent = '';
+        if (generalCardsContainer) {
+            originalCardsContent = generalCardsContainer.innerHTML;
+            generalCardsContainer.innerHTML = ''; // Clear only cards area
+        } else {
+            console.error(".general-cards container not found for loader.");
+            // Fallback: if no specific cards container, use the old method (might hide header)
+            // This part would ideally not be reached if HTML is structured correctly.
+            const originalContent = generalTabBody.innerHTML;
+            generalTabBody.innerHTML = generalHeader ? generalHeader.outerHTML : ''; // Keep header if possible
+        }
         
-        // Clear the content and show loader
-        generalTabBody.innerHTML = '';
-        showTabLoader('.general-tab-body');
+        // Show loader within the general tab body (or specifically cards container if possible)
+        // showTabLoader expects a selector for the parent of the loader.
+        // If generalCardsContainer exists, we've cleared it. If not, showTabLoader will append to generalTabBody.
+        showTabLoader(generalCardsContainer ? '.general-tab-body .general-cards' : '.general-tab-body');
         isLoading = true;
         
         // Strip timestamps before sending to API
@@ -943,48 +1000,55 @@ async function loadGeneralStats() {
         
         // Log the raw data received from the API
         console.log('Raw english_stats API response:', statsData);
-        console.log('English score:', statsData.english_score);
-        console.log('Grammar score:', statsData.grammar_score);
-        console.log('Vocabulary score:', statsData.vocabulary_score);
-        console.log('Fluency score:', statsData.fluency_score);
         
-        // Log the full data structure as JSON
-        console.log('Full english_stats data (JSON):', JSON.stringify(statsData, null, 2));
+        // Restore the original content or structure
+        if (generalCardsContainer) {
+            generalCardsContainer.innerHTML = originalCardsContent; // Restore cards content
+        } else if (generalHeader) {
+            // If we fell back and cleared generalTabBody but kept header, re-insert original content after header
+            // This is a complex fallback; best if generalCardsContainer always exists.
+            // For simplicity, if generalCardsContainer is missing, the displayGeneralStats will repopulate from scratch anyway.
+        }
         
-        // Restore the original content
-        generalTabBody.innerHTML = originalContent;
-        
-        // Process and display stats data
+        // Process and display stats data (this will repopulate .general-cards)
         displayGeneralStats(statsData);
         
-        // Hide loader
-        hideTabLoader('.general-tab-body');
+        // Hide loader (it was placed in generalCardsContainer or generalTabBody)
+        hideTabLoader(generalCardsContainer ? '.general-tab-body .general-cards' : '.general-tab-body');
         isLoading = false;
     } catch (error) {
         console.error('Error loading general stats:', error);
         
-        // Restore the original view if available
         const generalTabBody = document.querySelector('.general-tab-body');
-        if (generalTabBody && !generalTabBody.querySelector('.general-header')) {
-            generalTabBody.innerHTML = `
-                <div class="general-header">
-                    <div class="header2">
-                        <div class="icon">⭐️</div>
-                        <div class="h-2-header">General</div>
-                    </div>
-                    <div class="frame-565">
-                        <div class="paragraph">
-                            Error analyzing your speech. Please try again.
+        const generalCardsContainer = generalTabBody ? generalTabBody.querySelector('.general-cards') : null;
+
+        if (generalCardsContainer) {
+            generalCardsContainer.innerHTML = '<div class="error-message" style="text-align:center; padding:20px; color:red;">Error analyzing your speech. Please try again.</div>';
+        } else if (generalTabBody) {
+            // If general-cards is not found, but general-tab-body exists, display error there (header might be missing)
+            // Ensure header is present or reconstructed if displaying error in the main body
+            if (!generalTabBody.querySelector('.general-header')) {
+                 generalTabBody.innerHTML = `
+                    <div class="general-header">
+                        <div class="header2">
+                            <div class="icon">⭐️</div>
+                            <div class="h-2-header">General</div>
+                        </div>
+                        <div class="frame-565">
+                             <div class="paragraph">Error analyzing your speech. Please try again.</div>
                         </div>
                     </div>
-                </div>
-                <div class="general-cards">
-                    <!-- Original cards would go here -->
-                </div>
-            `;
+                    <div class="general-cards">
+                         <div class="error-message" style="text-align:center; padding:20px; color:red;">Please try refreshing.</div>
+                    </div>
+                `; // Reconstruct basic structure with error
+            } else {
+                 // Header exists, just put error in a reconstructed cards div
+                 generalTabBody.innerHTML += '<div class="general-cards"><div class="error-message" style="text-align:center; padding:20px; color:red;">Error analyzing your speech. Please try again.</div></div>';
+            }
         }
         
-        hideTabLoader('.general-tab-body');
+        hideTabLoader(generalCardsContainer ? '.general-tab-body .general-cards' : '.general-tab-body');
         isLoading = false;
     }
 }
