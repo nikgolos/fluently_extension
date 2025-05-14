@@ -551,7 +551,6 @@ function createSynonymsSection(synonyms) {
 // Create a synonym card
 function createSynonymCard(synonym) {
     try {
-        console.log('Creating synonym card for:', JSON.stringify(synonym));
         
         // Create card container
         const card = document.createElement('div');
@@ -687,7 +686,6 @@ function createRephrasingSection(rephrasings) {
 // Create a rephrasing card
 function createRephrasingCard(rephrasing) {
     try {
-        console.log('Creating rephrasing card for:', JSON.stringify(rephrasing));
         
         // Create card container
         const card = document.createElement('div');

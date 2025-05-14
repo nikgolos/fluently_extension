@@ -43,13 +43,11 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Add click event listeners to tabs with debugging
   generalTab.addEventListener('click', function() {
-    console.log('General tab clicked');
     switchTab(generalTab, generalTabBody);
   });
   
   // Load grammar data on grammar tab click
   grammarTab.addEventListener('click', function() {
-    console.log('Grammar tab clicked');
     switchTab(grammarTab, grammarTabBody);
     
     // If the main.js is loaded, it will handle data loading via setupTabListeners
@@ -60,7 +58,6 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Load vocabulary data on vocabulary tab click
   vocabularyTab.addEventListener('click', function() {
-    console.log('Vocabulary tab clicked');
     switchTab(vocabularyTab, vocabularyTabBody);
     
     // If the main.js is loaded, it will handle data loading via setupTabListeners
@@ -70,7 +67,6 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   
   fluencyTab.addEventListener('click', function() {
-    console.log('Fluency tab clicked');
     switchTab(fluencyTab, fluencyTabBody);
   });
   
