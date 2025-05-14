@@ -10,6 +10,53 @@ let statsData = null;
 let frontendStats = null; // Store frontend calculated stats
 let isLoading = false;
 
+// Function to load and inline the score SVG, adding an ID to the dynamic path
+async function loadAndInlineScoreSVG() {
+    try {
+        const response = await fetch('post-meeting/src/background0.svg');
+        if (!response.ok) {
+            throw new Error(`Failed to fetch SVG: ${response.statusText}`);
+        }
+        const svgText = await response.text();
+        const container = document.getElementById('scoreTriangleContainer');
+
+        if (container) {
+            const parser = new DOMParser();
+            const svgDoc = parser.parseFromString(svgText, "image/svg+xml");
+            const paths = svgDoc.getElementsByTagName('path');
+            let targetPathFound = false;
+            for (let path of paths) {
+                if (path.getAttribute('d') === "M64.2834 98.2175L82.9834 26.8429L151.733 125.168L64.2834 98.2175Z") {
+                    path.setAttribute('id', 'dynamicScoreTriangle');
+                    targetPathFound = true;
+                    console.log("Target path for dynamicScoreTriangle ID'd.");
+                    break;
+                }
+            }
+
+            if (!targetPathFound) {
+                console.warn("Target path for dynamicScoreTriangle not found via specific 'd' attribute. SVG might have changed or 'd' is different.");
+                // As a fallback, just insert the original SVG text if path wasn't ID'd
+                // This won't make the triangle dynamic but prevents breaking the display
+                container.innerHTML = svgText;
+            } else {
+                const serializer = new XMLSerializer();
+                container.innerHTML = serializer.serializeToString(svgDoc.documentElement);
+            }
+            console.log("Score SVG processed and inlined.");
+        } else {
+            console.error('scoreTriangleContainer div not found in HTML.');
+        }
+    } catch (error) {
+        console.error('Error loading or inlining SVG:', error);
+        // Optionally, provide a fallback visual or message in the container
+        const container = document.getElementById('scoreTriangleContainer');
+        if (container) {
+            container.innerHTML = '<p style="color:red; text-align:center;">Error loading score visual.</p>';
+        }
+    }
+}
+
 // Initialize the application
 async function initApp() {
     try {
@@ -20,6 +67,9 @@ async function initApp() {
         if (!transcriptId) {
             throw new Error('No transcript ID provided in URL');
         }
+        
+        // Iniline Score SVG first
+        await loadAndInlineScoreSVG();
         
         // Load transcript data from chrome storage
         transcriptText = await loadTranscriptFromStorage(transcriptId);
@@ -996,6 +1046,9 @@ function displayGeneralStats(data) {
         
         // Apply color-coding logic to the three scores
         applyScoreColors(fluencyScore, grammarScore, vocabularyScore);
+
+        // Update the dynamic score triangle
+        updateScoreTriangle(fluencyScore, grammarScore, vocabularyScore);
         
         // Update summary text if available
         if (data.summary) {
@@ -1121,6 +1174,62 @@ function applyScoreColors(fluencyScore, grammarScore, vocabularyScore) {
         grammar: grammarColor, 
         vocabulary: vocabularyColor 
     });
+}
+
+// Function to update the score triangle in the SVG
+function updateScoreTriangle(fluencyScore, grammarScore, vocabularyScore) {
+    // Visual anchors of the large background triangle, corresponding to label Placements
+    const anchor_TOP = { x: 84.6794, y: 3.03113 };         // Visual Top (where "Vocabulary" is labelled)
+    const anchor_BOTTOM_LEFT = { x: 4.09192, y: 132.318 }; // Visual Bottom-Left (where "Fluency" is labelled)
+    const anchor_BOTTOM_RIGHT = { x: 161.875, y: 132.318 };// Visual Bottom-Right (where "Grammar" is labelled)
+
+    // Calculate Centroid of the large triangle (remains the same)
+    const Cx = (anchor_TOP.x + anchor_BOTTOM_LEFT.x + anchor_BOTTOM_RIGHT.x) / 3;
+    const Cy = (anchor_TOP.y + anchor_BOTTOM_LEFT.y + anchor_BOTTOM_RIGHT.y) / 3;
+    const Centroid = { x: Cx, y: Cy };
+
+    console.log("Score Triangle - Centroid:", Centroid, "Input Scores:", { fluencyScore, grammarScore, vocabularyScore });
+
+    // Normalize scores to be within 0-100 range, providing a default of 0 if undefined
+    const normFluencyScore = Math.max(0, Math.min(100, fluencyScore || 0));
+    const normGrammarScore = Math.max(0, Math.min(100, grammarScore || 0));
+    const normVocabularyScore = Math.max(0, Math.min(100, vocabularyScore || 0));
+
+    // Calculate points for the dynamic triangle based on visual label positions
+    // Point for the TOP of the dynamic triangle (corresponds to Vocabulary score and anchor_TOP)
+    const pointForVisualTop = {
+        x: Centroid.x + (normVocabularyScore / 100) * (anchor_TOP.x - Centroid.x),
+        y: Centroid.y + (normVocabularyScore / 100) * (anchor_TOP.y - Centroid.y)
+    };
+
+    // Point for the BOTTOM-LEFT of the dynamic triangle (corresponds to Fluency score and anchor_BOTTOM_LEFT)
+    const pointForVisualBottomLeft = {
+        x: Centroid.x + (normFluencyScore / 100) * (anchor_BOTTOM_LEFT.x - Centroid.x),
+        y: Centroid.y + (normFluencyScore / 100) * (anchor_BOTTOM_LEFT.y - Centroid.y)
+    };
+
+    // Point for the BOTTOM-RIGHT of the dynamic triangle (corresponds to Grammar score and anchor_BOTTOM_RIGHT)
+    const pointForVisualBottomRight = {
+        x: Centroid.x + (normGrammarScore / 100) * (anchor_BOTTOM_RIGHT.x - Centroid.x),
+        y: Centroid.y + (normGrammarScore / 100) * (anchor_BOTTOM_RIGHT.y - Centroid.y)
+    };
+
+    console.log("Score Triangle - Calculated Visual Points: Top(Vocab):");
+    console.log(pointForVisualTop);
+    console.log("BottomLeft(Fluency):");
+    console.log(pointForVisualBottomLeft);
+    console.log("BottomRight(Grammar):");
+    console.log(pointForVisualBottomRight);
+
+    const scoreTrianglePath = document.getElementById('dynamicScoreTriangle');
+    if (scoreTrianglePath) {
+        // Construct the new path 'd' attribute string, connecting points in a consistent visual order (Top, Bottom-Left, Bottom-Right)
+        const newPathD = `M ${pointForVisualTop.x.toFixed(4)},${pointForVisualTop.y.toFixed(4)} L ${pointForVisualBottomLeft.x.toFixed(4)},${pointForVisualBottomLeft.y.toFixed(4)} L ${pointForVisualBottomRight.x.toFixed(4)},${pointForVisualBottomRight.y.toFixed(4)} Z`;
+        scoreTrianglePath.setAttribute('d', newPathD);
+        console.log("Score Triangle - Updated path d attribute:", newPathD);
+    } else {
+        console.error('dynamicScoreTriangle path element not found in the SVG. SVG loading or IDing might have failed.');
+    }
 }
 
 // Function to load and display stats calculated by transcript_stats.js
