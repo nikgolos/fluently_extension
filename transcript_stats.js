@@ -600,12 +600,29 @@ function calculateGarbageWordStats(text) {
           topGarbageWords[word] = count;
         });
         
-        // Calculate percentage of garbage words from total words
+        // Calculate the total of garbage words that appear at least 2 times
+        let totalGarbageWordsFrequent = 0;
+        
+        // Count words from categories (excluding 'others')
+        for (const category in garbageWordsCount.byCategory) {
+          if (category !== 'others') {
+            totalGarbageWordsFrequent += garbageWordsCount.byCategory[category];
+          }
+        }
+        
+        // Count only words from 'others' that appear at least 2 times
+        Object.values(garbageWordsCount.uniqueGarbage).forEach(count => {
+          if (count >= 2) {
+            totalGarbageWordsFrequent += count;
+          }
+        });
+        
+        // Calculate percentage of frequent garbage words from total words
         const garbagePercentage = totalWords > 0 ? 
-          Math.round((garbageWordsCount.total / totalWords) * 100) : 0;
+          Math.round((totalGarbageWordsFrequent / totalWords) * 100) : 0;
         
         const result = {
-          totalGarbageWords: garbageWordsCount.total,
+          totalGarbageWords: totalGarbageWordsFrequent,
           garbageWordsByCategory: garbageWordsCount.byCategory,
           topGarbageWords: topGarbageWords,
           garbagePercentage: garbagePercentage
