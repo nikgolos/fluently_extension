@@ -72,16 +72,18 @@ async function initApp() {
         await loadAndInlineScoreSVG();
         
         // Load transcript data from chrome storage
-        transcriptText = await loadTranscriptFromStorage(transcriptId);
+        const transcriptData = await loadTranscriptFromStorage(transcriptId);
         
-        if (!transcriptText) {
-            throw new Error('Failed to load transcript data');
+        if (!transcriptData || typeof transcriptData.text !== 'string') {
+            throw new Error('Failed to load transcript data or text is missing/invalid');
         }
+        transcriptText = transcriptData.text; // Assign global transcriptText
         
-        console.log('Loaded transcript:', transcriptText.substring(0, 100) + '...');
-        
+        console.log('Loaded transcript text:', transcriptText.substring(0, 100) + '...');
+        console.log('Transcript Formatted Date from storage (for meeting info):', transcriptData.formattedDate);
+
         // Update meeting info (date and time)
-        updateMeetingInfo(transcriptId);
+        updateMeetingInfo(transcriptData.formattedDate);
         
         // Add event listeners to tabs
         setupTabListeners();
@@ -118,93 +120,118 @@ async function initApp() {
 // Load transcript from Chrome storage
 async function loadTranscriptFromStorage(transcriptId) {
     return new Promise((resolve, reject) => {
-        chrome.storage.local.get(null, function(result) {
+        chrome.storage.local.get([transcriptId, 'transcripts'], function(result) { // More targeted get
             if (chrome.runtime.lastError) {
                 return reject(new Error('Error accessing storage: ' + chrome.runtime.lastError.message));
             }
             
-            console.log('Chrome storage contents:', result);
+            console.log('Chrome storage contents for loadTranscriptFromStorage:', result);
             
-            // Try to find the transcript in result.transcripts (object format)
-            if (result.transcripts) {
-                // Check if transcripts is an object with ID as keys
-                if (typeof result.transcripts === 'object' && !Array.isArray(result.transcripts)) {
-                    const transcript = result.transcripts[transcriptId];
-                    if (transcript) {
-                        console.log('Found transcript in transcripts object:', transcript);
-                        return resolve(transcript.text || '');
-                    }
-                } 
-                // Check if transcripts is an array
-                else if (Array.isArray(result.transcripts)) {
-                    const transcript = result.transcripts.find(t => t.id === transcriptId || t.sessionId === transcriptId);
-                    if (transcript) {
-                        console.log('Found transcript in transcripts array:', transcript);
-                        return resolve(transcript.text || '');
-                    }
-                }
+            let transcriptObject = null;
+
+            // 1. Check directly by transcriptId key
+            if (result[transcriptId] && typeof result[transcriptId] === 'object') {
+                transcriptObject = result[transcriptId];
+                console.log('Found transcript directly by ID:', transcriptObject);
             }
-            
-            // Try to find the transcript directly at the root level
-            if (result[transcriptId]) {
-                console.log('Found transcript at root level:', result[transcriptId]);
-                return resolve(result[transcriptId].text || result[transcriptId]);
-            }
-            
-            // If we get here, we haven't found the transcript yet
-            // Let's search all storage for anything that might be our transcript
-            for (const key in result) {
-                if (key.includes(transcriptId) || (typeof result[key] === 'object' && result[key] && result[key].id === transcriptId)) {
-                    console.log(`Found potential transcript match in key ${key}:`, result[key]);
-                    if (result[key].text) {
-                        return resolve(result[key].text);
-                    } else if (typeof result[key] === 'string') {
-                        return resolve(result[key]);
+            // 2. Check within a 'transcripts' object store if not found directly
+            else if (result.transcripts && typeof result.transcripts === 'object') {
+                if (result.transcripts[transcriptId]) {
+                    transcriptObject = result.transcripts[transcriptId];
+                    console.log('Found transcript in result.transcripts object store:', transcriptObject);
+                } else {
+                    // Fallback: If result.transcripts is an array (older format?)
+                    if (Array.isArray(result.transcripts)) {
+                        const foundInArray = result.transcripts.find(t => t.id === transcriptId || t.sessionId === transcriptId);
+                        if (foundInArray) {
+                            transcriptObject = foundInArray;
+                            console.log('Found transcript in result.transcripts array:', transcriptObject);
+                        }
                     }
                 }
             }
-            
-            return reject(new Error(`Transcript with ID ${transcriptId} not found in storage`));
+
+            if (transcriptObject && typeof transcriptObject.text !== 'undefined') {
+                // Ensure formattedDate is present, even if null
+                if (typeof transcriptObject.formattedDate === 'undefined') {
+                    transcriptObject.formattedDate = null;
+                }
+                resolve(transcriptObject);
+            } else if (typeof result[transcriptId] === 'string') { // Fallback for old format where ID maps directly to text
+                 console.warn('Transcript was a string, creating object with null formattedDate');
+                 resolve({ text: result[transcriptId], formattedDate: null, id: transcriptId });
+            }else {
+                reject(new Error(`Transcript with ID ${transcriptId} not found or has no text field.`));
+            }
         });
     });
 }
 
 // Update meeting info with date and time from transcript ID or storage
-function updateMeetingInfo(transcriptId) {
+function updateMeetingInfo(formattedDateFromStorage) { // transcriptId is no longer the primary source
     try {
-        // Try to parse date from transcript ID (if it contains a timestamp)
+        let displayDate = 'Meeting Date & Time'; // Default text
         let meetingDate;
-        
-        if (transcriptId.includes('-')) {
-            const timestamp = parseInt(transcriptId.split('-')[0]);
-            if (!isNaN(timestamp)) {
-                meetingDate = new Date(timestamp);
+
+        if (formattedDateFromStorage) {
+            console.log('Using formattedDate from storage:', formattedDateFromStorage);
+            // Try to parse the date from storage
+            try {
+                // Try to parse the date (handles various date formats)
+                meetingDate = new Date(formattedDateFromStorage);
+                if (isNaN(meetingDate.getTime())) {
+                    // If we couldn't parse it as a date, try to extract date components from a string format
+                    const dateMatch = formattedDateFromStorage.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                    if (dateMatch) {
+                        meetingDate = new Date(`${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`);
+                    } else {
+                        throw new Error('Unparseable date format');
+                    }
+                }
+            } catch (error) {
+                console.warn('Could not parse storage date, using fallback logic:', error);
+                meetingDate = null;
             }
         }
         
-        // If we couldn't parse from ID, use current date
+        // Fallback logic if formattedDateFromStorage is not parseable or not available
         if (!meetingDate || isNaN(meetingDate.getTime())) {
-            meetingDate = new Date();
+            console.warn('No valid date from storage, attempting fallback for meeting info.');
+            const urlParams = new URLSearchParams(window.location.search);
+            const currentTranscriptId = urlParams.get('id');
+            
+            if (currentTranscriptId && currentTranscriptId.includes('-')) {
+                const timestamp = parseInt(currentTranscriptId.split('-')[0]);
+                if (!isNaN(timestamp)) {
+                    meetingDate = new Date(timestamp);
+                }
+            }
+            if (!meetingDate || isNaN(meetingDate.getTime())) {
+                meetingDate = new Date(); // Ultimate fallback to current time
+            }
         }
         
-        // Format the date and time
-        const options = { 
-            month: 'numeric', 
-            day: 'numeric', 
-            year: 'numeric',
-            hour: 'numeric',
-            minute: 'numeric',
-            hour12: true
-        };
-        const formattedDateTime = meetingDate.toLocaleDateString('en-US', options);
+        // Always format in the "5 May 2025 at 6:25 PM" format
+        const day = meetingDate.getDate();
+        const month = meetingDate.toLocaleString('en-US', { month: 'long' });
+        const year = meetingDate.getFullYear();
+        const hour = meetingDate.getHours() % 12 || 12;
+        const minute = meetingDate.getMinutes().toString().padStart(2, '0');
+        const ampm = meetingDate.getHours() >= 12 ? 'PM' : 'AM';
         
-        // Update the meeting info in the UI
+        displayDate = `${day} ${month} ${year} at ${hour}:${minute} ${ampm}`;
+        console.log('Formatted meeting info display date:', displayDate);
+        
         const meetingInfoElement = document.querySelector('.meeting-info');
         if (meetingInfoElement) {
-            meetingInfoElement.textContent = formattedDateTime;
+            meetingInfoElement.textContent = displayDate;
         }
     } catch (error) {
         console.error('Error updating meeting info:', error);
+        const meetingInfoElement = document.querySelector('.meeting-info');
+        if (meetingInfoElement) {
+            meetingInfoElement.textContent = 'Meeting Date & Time Unavailable'; // Error state text
+        }
     }
 }
 
