@@ -994,6 +994,9 @@ function displayGeneralStats(data) {
             fluencyElement.textContent = `${fluencyScore}%`;
         }
         
+        // Apply color-coding logic to the three scores
+        applyScoreColors(fluencyScore, grammarScore, vocabularyScore);
+        
         // Update summary text if available
         if (data.summary) {
             const paragraphElement = document.querySelector('.frame-565 .paragraph');
@@ -1027,6 +1030,97 @@ function displayGeneralStats(data) {
     } catch (error) {
         console.error('Error updating general stats UI:', error);
     }
+}
+
+// Function to apply color-coding to score displays based on the specified rules
+function applyScoreColors(fluencyScore, grammarScore, vocabularyScore) {
+    console.log('Applying color logic to scores:', { fluencyScore, grammarScore, vocabularyScore });
+    
+    // Get the elements for each score
+    const fluencyElement = document.querySelector('.title .title-span3');
+    const grammarElement = document.querySelector('.title2 .title-2-span3');
+    const vocabularyElement = document.querySelector('.title3 .title-3-span3');
+    
+    // Default colors - red
+    let fluencyColor = '#FF5252'; // red
+    let grammarColor = '#FF5252'; // red
+    let vocabularyColor = '#FF5252'; // red
+    
+    // Create an array of scores with their elements for sorting
+    const scores = [
+        { score: fluencyScore, name: 'fluency' },
+        { score: grammarScore, name: 'grammar' },
+        { score: vocabularyScore, name: 'vocabulary' }
+    ];
+    
+    // Rule 1: If ALL 3 scores are <= 30, ALL should be RED
+    if (fluencyScore <= 30 && grammarScore <= 30 && vocabularyScore <= 30) {
+        console.log('Rule 1: All scores <= 30, setting all to RED');
+        // All colors already set to red by default
+    }
+    // Rule 2: If ONLY 1 score out of 3 > 30, that one should be GREEN
+    else if ((fluencyScore > 30 && grammarScore <= 30 && vocabularyScore <= 30) || 
+             (fluencyScore <= 30 && grammarScore > 30 && vocabularyScore <= 30) ||
+             (fluencyScore <= 30 && grammarScore <= 30 && vocabularyScore > 30)) {
+        console.log('Rule 2: Only one score > 30, setting it to GREEN');
+        if (fluencyScore > 30) fluencyColor = '#4CAF50'; // green
+        if (grammarScore > 30) grammarColor = '#4CAF50'; // green
+        if (vocabularyScore > 30) vocabularyColor = '#4CAF50'; // green
+    }
+    // Rule 3: If 2 or 3 scores > 30
+    else {
+        // Sort scores from highest to lowest
+        scores.sort((a, b) => b.score - a.score);
+        
+        console.log('Sorted scores:', scores.map(s => `${s.name}: ${s.score}`).join(', '));
+        
+        // Calculate difference between top 1 and top 2
+        const diffTop1Top2 = scores[0].score - scores[1].score;
+        
+        // Prepare a map to track which scores should be green
+        const greenScores = new Set();
+        
+        if (diffTop1Top2 >= 15) {
+            // Only top 1 is GREEN
+            console.log('Rule 3a: Top score - second score < 10, only top score is GREEN');
+            greenScores.add(scores[0].name);
+        } else {
+            // Top 1 and top 2 are GREEN
+            console.log('Rule 3b: Top score - second score >= 10, top two scores are GREEN');
+            greenScores.add(scores[0].name);
+            greenScores.add(scores[1].name);
+        }
+        
+        // Apply colors based on the names in the greenScores set
+        if (greenScores.has('fluency')) fluencyColor = '#4CAF50';
+        if (greenScores.has('grammar')) grammarColor = '#4CAF50';
+        if (greenScores.has('vocabulary')) vocabularyColor = '#4CAF50';
+    }
+    
+    // Final override: ALL scores > 70 should be GREEN
+    if (fluencyScore > 70) {
+        fluencyColor = '#4CAF50'; // green
+        console.log('Override: Fluency score > 70, setting to GREEN');
+    }
+    if (grammarScore > 70) {
+        grammarColor = '#4CAF50'; // green
+        console.log('Override: Grammar score > 70, setting to GREEN');
+    }
+    if (vocabularyScore > 70) {
+        vocabularyColor = '#4CAF50'; // green
+        console.log('Override: Vocabulary score > 70, setting to GREEN');
+    }
+    
+    // Apply the colors to the elements
+    if (fluencyElement) fluencyElement.style.color = fluencyColor;
+    if (grammarElement) grammarElement.style.color = grammarColor;
+    if (vocabularyElement) vocabularyElement.style.color = vocabularyColor;
+    
+    console.log('Applied colors:', { 
+        fluency: fluencyColor, 
+        grammar: grammarColor, 
+        vocabulary: vocabularyColor 
+    });
 }
 
 // Function to load and display stats calculated by transcript_stats.js
@@ -1152,7 +1246,7 @@ function displayFluencyData(stats) {
         } else if (wpmForDisplay >= 100 && wpmForDisplay <= 150) {
             wpmLabelElement.textContent = "Amazing!";
             wpmLabelElement.classList.add('green-label');
-            wpmFeedbackTextElement.textContent = "It’s right at the recommended level";
+            wpmFeedbackTextElement.textContent = "It's right at the recommended level";
             console.log("WPM 100-150: Applied 'Amazing!' feedback.");
         } else { // wpmForDisplay > 150
             wpmLabelElement.textContent = "Slow down!";
