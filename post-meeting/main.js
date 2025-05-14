@@ -880,6 +880,27 @@ function setupButtonHandlers() {
     const shareButton = document.querySelector('.share-button');
     const returnButton = document.querySelector('.return-button');
     
+    // Add CSS for button hover and press effects
+    if (!document.getElementById('button-effects-style')) {
+        const style = document.createElement('style');
+        style.id = 'button-effects-style';
+        style.textContent = `
+            .share-button, .return-button {
+                cursor: pointer;
+                transition: transform 0.15s ease, box-shadow 0.15s ease;
+            }
+            .share-button:hover, .return-button:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            }
+            .share-button:active, .return-button:active {
+                transform: translateY(0);
+                box-shadow: 0 0px 1px rgba(0, 0, 0, 0.1);
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
     // Share button handler
     if (shareButton) {
         shareButton.addEventListener('click', () => {
