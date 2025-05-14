@@ -1317,12 +1317,17 @@ function displayFluencyData(stats) {
     const uselessWordsPercentText = document.querySelector('.fluency-tab-body .fillers-card .text-section .text');
     if (uselessWordsPercentText) {
         // Determine label class and text based on the garbage percentage
-        let labelClass = garbagePercentage <= 5 ? 'green-label' : 'red-label';
-        let labelText = garbagePercentage <= 5 ? 'Great done!' : 'Too much!';
+        let labelClass = garbagePercentage <= 1 ? 'green-label' : (garbagePercentage <= 5 ? 'green-label' : 'red-label');
+        let labelText = garbagePercentage <= 1 ? 'Excellent!' : (garbagePercentage <= 5 ? 'Great done!' : 'Too much!');
         
-        // Create the new HTML content
-        uselessWordsPercentText.innerHTML = `<span class="${labelClass}">${labelText}</span> That is ${garbagePercentage}% of your speech`;
-        console.log(`Updated useless words percentage to: ${garbagePercentage}% with label: ${labelText}`);
+        // Build the HTML content, conditionally including the percentage text
+        let htmlContent = `<span class="${labelClass}">${labelText}</span>`;
+        if (garbagePercentage > 1) {
+            htmlContent += ` That is ${garbagePercentage}% of your speech`;
+        }
+        
+        uselessWordsPercentText.innerHTML = htmlContent;
+        console.log(`Updated useless words percentage. Label: ${labelText}, Percentage shown: ${garbagePercentage > 1 ? garbagePercentage + '%' : 'Hidden'}`);
     } else {
         console.error("Useless words percentage element not found with selector: .fluency-tab-body .fillers-card .text-section .text");
     }
