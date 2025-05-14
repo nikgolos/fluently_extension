@@ -1106,8 +1106,8 @@ function displayFluencyData(stats) {
     const uselessWordsPercentText = document.querySelector('.fluency-tab-body .fillers-card .text-section .text');
     if (uselessWordsPercentText) {
         // Determine label class and text based on the garbage percentage
-        let labelClass = garbagePercentage <= 10 ? 'green-label' : 'red-label';
-        let labelText = garbagePercentage <= 10 ? 'Great done!' : 'Too much!';
+        let labelClass = garbagePercentage <= 5 ? 'green-label' : 'red-label';
+        let labelText = garbagePercentage <= 5 ? 'Great done!' : 'Too much!';
         
         // Create the new HTML content
         uselessWordsPercentText.innerHTML = `<span class="${labelClass}">${labelText}</span> That is ${garbagePercentage}% of your speech`;
@@ -1199,7 +1199,7 @@ function displayFluencyData(stats) {
         let paragraphText = '';
         
         // Determine text based on combination of garbage percentage and WPM
-        if (garbagePercentage > 10) {
+        if (garbagePercentage > 5) {
             if (actualWpm >= 100 && actualWpm <= 150) {
                 paragraphText = "Try to use less useless words next time";
             } else if (actualWpm > 150) {
@@ -1207,7 +1207,7 @@ function displayFluencyData(stats) {
             } else { // WPM < 100
                 paragraphText = "Try to use less useless words and speak a bit faster next time";
             }
-        } else { // garbagePercentage <= 10
+        } else { // garbagePercentage <= 5
             if (actualWpm >= 100 && actualWpm <= 150) {
                 paragraphText = "You demonstrated great fluency skills!";
             } else if (actualWpm > 150) {
@@ -1226,7 +1226,7 @@ function displayFluencyData(stats) {
     // Calculate fluency mistakes count for badge
     let fluencyMistakesCount = 0;
     const hasWpmIssue = actualWpm < 100 || actualWpm > 150;
-    const hasGarbageIssue = garbagePercentage > 10;
+    const hasGarbageIssue = garbagePercentage > 5;
     
     if (hasWpmIssue && hasGarbageIssue) {
         fluencyMistakesCount = 2; // Both conditions are true

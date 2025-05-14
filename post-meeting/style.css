@@ -517,7 +517,7 @@ h1 {
   line-height: 14px;
   font-weight: 400;
   position: absolute;
-  left: 220px;
+  left: 209px;
   top: 0px;
   display: flex;
   align-items: center;
@@ -1656,7 +1656,7 @@ h1 {
   line-height: var(--subheadline-regular-line-height, 14px);
   font-weight: var(--subheadline-regular-font-weight, 400);
   position: absolute;
-  left: 70px;
+  left: 87px;
   top: 0px;
   display: flex;
   align-items: center;
