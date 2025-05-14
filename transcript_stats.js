@@ -166,7 +166,7 @@ function calculateTranscriptStats(transcript) {
   // Calculate words per minute using the corrected speaking time
   let wpm = 0;
   if (speakingTimeSeconds > 0 && totalWords > 0) {
-    wpm = parseFloat(((totalWords / speakingTimeSeconds) * 60).toFixed(1));
+    wpm = parseFloat(((totalWords / speakingTimeSeconds) * 60 * 1.12).toFixed(1));
     console.log(`WPM calculation: (${totalWords} words / ${speakingTimeSeconds} seconds) * 60 = ${wpm}`);
   } else if (totalWords > 0) {
     // If for some reason we have words but no valid speaking time, estimate based on 1 word per second
@@ -200,6 +200,10 @@ function calculateTranscriptStats(transcript) {
     .then(garbageStats => {
       // Add garbage stats to the overall stats
       stats.garbage_words = garbageStats;
+      
+      const fluencyScoreResult = calculateFluencyScore(wpm, garbageStats.garbagePercentage);
+      stats.fluency_score = fluencyScoreResult.fluencyScore;
+      console.log(`Added fluency_score to stats: ${stats.fluency_score} (WPM Penalty: ${fluencyScoreResult.wpmPenalty}, Garbage Penalty: ${fluencyScoreResult.garbagePenalty})`);
       
       // Store the stats
       saveTranscriptStats(stats, transcript.id);
@@ -256,12 +260,7 @@ function calculateTimeStats(text) {
       endIndex++;
     }
   }
-  
-  console.log("Start time markers:", startTimeMatches);
-  console.log("End time markers:", endTimeMatches);
-  console.log("Start times (seconds):", startTimes);
-  console.log("End times (seconds):", endTimes);
-  console.log("Initial time segments:", timeSegments);
+
   
   if (startTimes.length === 0 || endTimes.length === 0) {
     console.warn("No speaking times found in transcript");
@@ -348,13 +347,9 @@ function calculateWordStats(text) {
   // Second cleaning pass to ensure no brackets remain and normalize spaces
   const cleanText = cleanedText.replace(/\[[^\]]*\]/g, ' ').replace(/\s+/g, ' ').trim();
   
-  // Log the clean text for debugging
-  console.log("Clean text for word count:", cleanText);
-  
   // Split by single spaces to properly count words
   const allWords = cleanText.split(' ').filter(word => word.length > 0);
   
-  console.log("All words array:", allWords);
   console.log("Total word count:", allWords.length);
   
   // Clean up words for unique counting - preserve contractions like "don't"
@@ -374,7 +369,6 @@ function calculateWordStats(text) {
   // Count unique words
   const uniqueWords = new Set(cleanedWords);
   
-  console.log("Unique words set:", [...uniqueWords].sort());
   console.log("Unique word count:", uniqueWords.size);
   
   return {
@@ -644,11 +638,67 @@ function calculateGarbageWordStats(text) {
   });
 }
 
+// Calculate fluency score based on WPM and garbage words percentage
+function calculateFluencyScore(wpm, garbagePercentage) {
+  
+  let wpmPenalty = 0;
+  let garbagePenalty = 0;
+  
+  // Calculate WPM penalty
+  if (wpm > 200 || wpm < 40) {
+    wpmPenalty = 59;
+  } else if (wpm > 185 || wpm < 50) {
+    wpmPenalty = 46;
+  } else if (wpm > 170 || wpm < 65) {
+    wpmPenalty = 33;
+  } else if (wpm > 155 || wpm < 90) {
+    wpmPenalty = 17;
+  } else if (wpm > 145 || wpm < 100) {
+    wpmPenalty = 9;
+  } else if (wpm > 140 || wpm < 115) {
+    wpmPenalty = 4;
+  } else {
+    wpmPenalty = 0;
+  }
+  
+  // Calculate garbage words penalty
+  if (garbagePercentage > 10) {
+    garbagePenalty = garbagePercentage * 4;
+  } else if (garbagePercentage > 7) {
+    garbagePenalty = garbagePercentage * 3.5;
+  } else if (garbagePercentage > 4) {
+    garbagePenalty = garbagePercentage * 2.5;
+  } else if (garbagePercentage > 2.5) {
+    garbagePenalty = garbagePercentage * 2;
+  } else {
+    garbagePenalty = 0;
+  }
+  
+  // Calculate total penalty
+  let totalPenalty = Math.round(wpmPenalty + garbagePenalty);
+
+  // Cap penalty at 99
+  if (totalPenalty > 99) {
+    totalPenalty = 99;
+  }
+  
+  // Calculate fluency score
+  const fluencyScore = 100 - totalPenalty;
+  
+  return {
+    fluencyScore,
+    wpmPenalty,
+    garbagePenalty,
+    totalPenalty
+  };
+}
+
 // Export functions
 window.TranscriptStats = {
   calculateTranscriptStats,
   getTranscriptStats,
   getAllTranscriptStats,
   fixTranscriptTimestamps,
-  calculateGarbageWordStats
+  calculateGarbageWordStats,
+  calculateFluencyScore
 }; 

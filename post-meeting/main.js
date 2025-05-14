@@ -979,8 +979,16 @@ function displayGeneralStats(data) {
             grammarElement.textContent = `${grammarScore}%`;
         }
         
-        // Update fluency score if available
-        const fluencyScore = data.fluency_score || 47; // Fallback to default
+        // Update fluency score - use frontend calculated score if available
+        let fluencyScore = 0;
+        if (frontendStats && frontendStats.fluency_score !== undefined) {
+            fluencyScore = frontendStats.fluency_score;
+            console.log('Using fluency score from frontend calculations:', fluencyScore);
+        } else {
+            fluencyScore = data.fluency_score || 47; // Fallback to API or default
+            console.log('Using fluency score from API or default:', fluencyScore);
+        }
+        
         const fluencyElement = document.querySelector('.title .title-span3');
         if (fluencyElement) {
             fluencyElement.textContent = `${fluencyScore}%`;
@@ -1119,8 +1127,6 @@ function displayFluencyData(stats) {
     // Update Words Per Minute text display (for "You said X words per min")
     let wpmForDisplay = stats.words_per_minute || 0;
     console.log(`Original WPM from transcript_stats.js (for text display calculation): ${wpmForDisplay}`);
-    wpmForDisplay = wpmForDisplay * 1.12; // Increase by 12%
-    console.log(`WPM after 12% increase (for text display): ${wpmForDisplay}`);
     wpmForDisplay = Math.round(wpmForDisplay); // Round to nearest whole number
     console.log(`Final rounded WPM for text display: ${wpmForDisplay}`);
     
@@ -1130,10 +1136,6 @@ function displayFluencyData(stats) {
         console.log(`Updated Fluency WPM text display to: ${wpmForDisplay}`);
     }
 
-    // Use actualWpm for conditional feedback and scale positioning
-    const actualWpm = stats.words_per_minute || 0;
-    console.log(`Actual WPM for feedback and scale: ${actualWpm}`);
-
     // Update WPM feedback label and text
     const wpmLabelElement = document.querySelector('.fluency-tab-body .pace-card .text-section .text > span:first-child');
     const wpmFeedbackTextElement = document.querySelector('#wpm-feedback');
@@ -1142,17 +1144,17 @@ function displayFluencyData(stats) {
         // Clear existing color classes
         wpmLabelElement.classList.remove('red-label', 'green-label');
 
-        if (actualWpm < 100) {
+        if (wpmForDisplay < 100) {
             wpmLabelElement.textContent = "Speed up!";
             wpmLabelElement.classList.add('red-label');
             wpmFeedbackTextElement.textContent = "It's slower than recommended";
             console.log("WPM < 100: Applied 'Speed up!' feedback.");
-        } else if (actualWpm >= 100 && actualWpm <= 150) {
+        } else if (wpmForDisplay >= 100 && wpmForDisplay <= 150) {
             wpmLabelElement.textContent = "Amazing!";
             wpmLabelElement.classList.add('green-label');
-            wpmFeedbackTextElement.textContent = "It is just in recommended level";
+            wpmFeedbackTextElement.textContent = "It’s right at the recommended level";
             console.log("WPM 100-150: Applied 'Amazing!' feedback.");
-        } else { // actualWpm > 150
+        } else { // wpmForDisplay > 150
             wpmLabelElement.textContent = "Slow down!";
             wpmLabelElement.classList.add('red-label');
             wpmFeedbackTextElement.textContent = "It's faster than recommended";
@@ -1174,14 +1176,14 @@ function displayFluencyData(stats) {
 
         let leftPositionPx;
 
-        if (actualWpm <= scaleMinWpm) {
+        if (wpmForDisplay <= scaleMinWpm) {
             leftPositionPx = indicatorMinLeftPx;
-        } else if (actualWpm >= scaleMaxWpm) {
+        } else if (wpmForDisplay >= scaleMaxWpm) {
             leftPositionPx = indicatorMaxLeftPx;
         } else {
             const wpmRange = scaleMaxWpm - scaleMinWpm; // 150
             const pixelRange = indicatorMaxLeftPx - indicatorMinLeftPx; // 300
-            const wpmOffset = actualWpm - scaleMinWpm;
+            const wpmOffset = wpmForDisplay - scaleMinWpm;
             leftPositionPx = indicatorMinLeftPx + (wpmOffset / wpmRange) * pixelRange;
         }
         
@@ -1190,7 +1192,7 @@ function displayFluencyData(stats) {
 
         wpmScoreIndicator.style.left = `${leftPositionPx}px`;
         wpmScoreIndicator.style.transform = 'translateX(-50%)';
-        console.log(`Positioned Fluency WPM indicator for actualWpm ${actualWpm} at left: ${leftPositionPx}px`);
+        console.log(`Positioned Fluency WPM indicator for wpmForDisplay ${wpmForDisplay} at left: ${leftPositionPx}px`);
     }
 
     // Update the Fluency tab paragraph based on useless words percentage and WPM
@@ -1200,17 +1202,17 @@ function displayFluencyData(stats) {
         
         // Determine text based on combination of garbage percentage and WPM
         if (garbagePercentage > 5) {
-            if (actualWpm >= 100 && actualWpm <= 150) {
+            if (wpmForDisplay >= 100 && wpmForDisplay <= 150) {
                 paragraphText = "Try to use less useless words next time";
-            } else if (actualWpm > 150) {
+            } else if (wpmForDisplay > 150) {
                 paragraphText = "Try to use less useless words and speak a bit slower next time";
             } else { // WPM < 100
                 paragraphText = "Try to use less useless words and speak a bit faster next time";
             }
         } else { // garbagePercentage <= 5
-            if (actualWpm >= 100 && actualWpm <= 150) {
+            if (wpmForDisplay >= 100 && wpmForDisplay <= 150) {
                 paragraphText = "You demonstrated great fluency skills!";
-            } else if (actualWpm > 150) {
+            } else if (wpmForDisplay > 150) {
                 paragraphText = "Try to speak a bit slower next time";
             } else { // WPM < 100
                 paragraphText = "Try to speak a bit faster next time";
@@ -1225,7 +1227,7 @@ function displayFluencyData(stats) {
 
     // Calculate fluency mistakes count for badge
     let fluencyMistakesCount = 0;
-    const hasWpmIssue = actualWpm < 100 || actualWpm > 150;
+    const hasWpmIssue = wpmForDisplay < 100 || wpmForDisplay > 150;
     const hasGarbageIssue = garbagePercentage > 5;
     
     if (hasWpmIssue && hasGarbageIssue) {
