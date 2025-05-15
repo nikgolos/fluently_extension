@@ -161,6 +161,17 @@
        display: none;
    }
 
+   .grammar-tab-body, .vocabulary-tab-body, .fluency-tab-body, .general-tab-body {
+        width: 794px;
+   }
+
+   @media (max-width: 800px) {
+      .grammar-tab-body, .vocabulary-tab-body, .fluency-tab-body, .general-tab-body {
+        width: 408px;
+        padding: 20px 30px;
+      }
+   }
+
    /* Styles for the score indicator */
    .speed-scale {
        position: relative; /* Ensure the indicator is positioned relative to the scale */
@@ -236,10 +247,8 @@
         </div>
         <div class="frame-565">
           <div class="paragraph">
-            Great result! You speak better than 85% of other non-natives.
-          </div>
-          <div class="info-circle-fill-1">
-            <img class="group" src="post-meeting/src/group0.svg" />
+            <!--Great result! You speak better than 85% of other non-natives.-->
+            Checkout your English score. It based on your grammar, vocabulary and fluency.
           </div>
         </div>
       </div>
