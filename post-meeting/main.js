@@ -1112,7 +1112,9 @@ function displayGeneralStats(data) {
     
     try {
         // Update English score - use general_score from backend
-        const englishScore = data.general_score || data.english_score || 0;
+        let englishScore = data.general_score || data.english_score || 0;
+        englishScore = (frontendStats.fluency_score - englishScore)/4 + englishScore;
+        englishScore = Math.round(englishScore);
         console.log('Using score from backend:', englishScore);
         
         const scoreElement = document.querySelector('.frame-569 .h-3-header');
