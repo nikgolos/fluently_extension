@@ -1,6 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const startButton = document.getElementById('startButton');
-  const stopButton = document.getElementById('stopButton');
   const viewTranscriptsButton = document.getElementById('viewTranscriptsButton');
   const debugArea = document.getElementById('debugArea');
   const languageLogsArea = document.getElementById('languageLogsArea');
@@ -61,12 +59,8 @@ document.addEventListener('DOMContentLoaded', () => {
     statusDiv.textContent = statusMessage;
     if (isRecording) {
       statusDiv.className = 'status recording';
-      startButton.disabled = true;
-      stopButton.disabled = false;
     } else {
       statusDiv.className = 'status';
-      startButton.disabled = !isMeetingPage || !isMeetingActive || !isParticipating;
-      stopButton.disabled = true;
     }
   }
 
@@ -171,7 +165,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!response.isMeetingActive) {
           updateStatus('Meeting has ended', false);
           logDebug('The meeting has ended. If you had a recording, the transcript will be saved automatically.');
-          startButton.disabled = true;
           return;
         }
         
@@ -195,65 +188,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
-
-  startButton.addEventListener('click', async () => {
-    try {
-      await injectContentScript();
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]) {
-          chrome.tabs.sendMessage(tabs[0].id, { action: 'startRecording' }, (response) => {
-            if (chrome.runtime.lastError) {
-              logDebug('Error: ' + chrome.runtime.lastError.message);
-            } else if (response && response.status === 'started') {
-              updateStatus('Recording in progress', true);
-              logDebug('Recording started - Speak now');
-              currentTranscript = ''; // Clear previous transcript
-            } else if (response && response.status === 'error') {
-              logDebug('Error: ' + response.error);
-              // If meeting ended, update UI
-              if (response.error.includes('meeting has ended')) {
-                updateStatus('Meeting has ended', false);
-                startButton.disabled = true;
-              }
-            }
-          });
-        }
-      });
-    } catch (error) {
-      logDebug('Error: ' + error.message);
-    }
-  });
-
-  stopButton.addEventListener('click', () => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]) {
-        chrome.tabs.sendMessage(tabs[0].id, { action: 'stopRecording' }, (response) => {
-          if (chrome.runtime.lastError) {
-            logDebug('Error: ' + chrome.runtime.lastError.message);
-          } else if (response && response.status === 'stopped') {
-            updateStatus('Processing transcript...', false);
-            logDebug('Recording stopped. Saving transcript...');
-            
-            // After a short delay, update status to ready
-            setTimeout(() => {
-              // Check if meeting is still active
-              chrome.tabs.sendMessage(tabs[0].id, { action: 'getStatus' }, (statusResponse) => {
-                if (statusResponse && !statusResponse.isMeetingActive) {
-                  updateStatus('Meeting has ended');
-                  startButton.disabled = true;
-                } else if (statusResponse && statusResponse.isParticipating) {
-                  updateStatus('In active meeting - Ready to record');
-                  logDebug('Recording will restart automatically in a few seconds while you are in the meeting.');
-                } else {
-                  updateStatus('Ready');
-                }
-              });
-            }, 3000);
-          }
-        });
-      }
-    });
-  });
   
   // View transcripts button handler
   viewTranscriptsButton.addEventListener('click', () => {
@@ -293,7 +227,6 @@ document.addEventListener('DOMContentLoaded', () => {
         logDebug('Transcript saved successfully!');
       } else if (message.text.includes('Meeting ended')) {
         updateStatus('Meeting has ended', false);
-        startButton.disabled = true;
         isMeetingActive = false;
         isParticipating = false;
         logDebug('Meeting has ended. Transcript will be saved automatically.');
@@ -313,7 +246,6 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (message.type === 'recordingStatus') {
       if (!message.isRecording && !isMeetingActive) {
         updateStatus('Meeting has ended');
-        startButton.disabled = true;
       } else {
         updateStatus(message.isRecording ? 'Recording in progress' : 'Ready', message.isRecording);
       }
@@ -323,7 +255,6 @@ document.addEventListener('DOMContentLoaded', () => {
       highlightLanguageLogs();
     } else if (message.type === 'nonEnglishDetected') {
       updateStatus('Non-English detected - Recording stopped', false);
-      startButton.disabled = false;
       
       // Parse the expiration time to show when recording will be available again
       const expirationTime = message.expirationTime ? new Date(message.expirationTime) : null;

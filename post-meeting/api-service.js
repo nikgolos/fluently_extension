@@ -2,7 +2,7 @@
 // Handles all API requests to the backend
 
 class ApiService {
-    constructor(baseUrl = 'http://localhost:8000') {
+    constructor(baseUrl = 'https://fluently-extension-backend-c1f2cc68e5b2.herokuapp.com/') {
         this.baseUrl = baseUrl;
     }
 
