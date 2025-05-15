@@ -91,12 +91,12 @@ async function checkLanguageIsEnglish(text) {
   const requestBody = JSON.stringify({ text: trimmedText });
   
   try {
-    console.log("[Language Detection] Sending API request to http://localhost:8000/detect_language");
+    console.log("[Language Detection] Sending API request to https://fluently-extension-backend-c1f2cc68e5b2.herokuapp.com/detect_language");
     console.log("[Language Detection] Request body:", requestBody);
     sendLanguageDetectionLog("Sending API request...");
     sendLanguageDetectionLog(`Request body: ${requestBody}`);
     
-    const response = await fetch('http://localhost:8000/detect_language', {
+    const response = await fetch('https://fluently-extension-backend-c1f2cc68e5b2.herokuapp.com/detect_language', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1209,7 +1209,7 @@ window.addEventListener('beforeunload', (event) => {
         // This is a synchronous request which is normally bad practice,
         // but we need it for the beforeunload event
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', 'http://localhost:8000/detect_language', false); // false makes it synchronous
+        xhr.open('POST', 'https://fluently-extension-backend-c1f2cc68e5b2.herokuapp.com/detect_language', false); // false makes it synchronous
         xhr.setRequestHeader('Content-Type', 'application/json');
         xhr.send(JSON.stringify({ text: textToCheck }));
         
