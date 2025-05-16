@@ -62,25 +62,37 @@ function countWordsInTranscript(text) {
 
 // Function to get the last N words from transcript
 function getLastNWords(text, n) {
-  if (!text) return '';
-  
-  // Remove timestamp markers
-  const timestampRegex = /\[\s*[SE]:\s*\d+(?:\.\d+)?s\s*\]/g;
-  const cleanedText = text.replace(timestampRegex, ' ');
-  
-  // Normalize spaces and split by space
-  const words = cleanedText.replace(/\s+/g, ' ').trim().split(' ')
-    .filter(word => word.length > 0);
-  
+  const words = text.split(/\s+/).filter(word => word.length > 0);
   // Get last n words
   return words.slice(-n).join(' ');
+}
+
+// Function to get or set userID for content script
+async function getOrSetUserID_content() {
+    return new Promise((resolve) => {
+        chrome.storage.local.get(['userID'], (result) => {
+            let currentUserID = result.userID;
+            if (currentUserID) {
+                // console.log('Found userID in storage (content.js):', currentUserID);
+                resolve(currentUserID);
+            } else {
+                const timestamp = Date.now();
+                const randomNumber = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+                currentUserID = `${timestamp}-${randomNumber}`;
+                chrome.storage.local.set({ userID: currentUserID }, () => {
+                    // console.log('Generated and saved new userID (content.js):', currentUserID);
+                    resolve(currentUserID);
+                });
+            }
+        });
+    });
 }
 
 // Function to check if language is English
 async function checkLanguageIsEnglish(text) {
   if (!text) return true;
   
-  const logMessage = `Checking language for text: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`;
+  const logMessage = `Checking language for text: \"${text.substring(0, 30)}${text.length > 30 ? '...' : ''}\"`;
   console.log("[Language Detection]", logMessage);
   sendLanguageDetectionLog(logMessage);
   
@@ -88,7 +100,9 @@ async function checkLanguageIsEnglish(text) {
   sendLanguageDetectionLog(`Text length: ${text.length} characters`);
   
   const trimmedText = text.substring(0, 250); // Respect the 250 char limit
-  const requestBody = JSON.stringify({ text: trimmedText });
+  const userID = await getOrSetUserID_content();
+  const payload = { text: trimmedText, userID: userID };
+  const requestBody = JSON.stringify(payload);
   
   try {
     console.log("[Language Detection] Sending API request to https://fluently-extension-backend-c1f2cc68e5b2.herokuapp.com/detect_language");

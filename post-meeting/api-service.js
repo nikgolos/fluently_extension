@@ -6,19 +6,52 @@ class ApiService {
         this.baseUrl = baseUrl;
     }
 
+    // Method to get or set userID
+    async getOrSetUserID() {
+        return new Promise((resolve) => {
+            chrome.storage.local.get(['userID'], (result) => {
+                let currentUserID = result.userID;
+                if (currentUserID) {
+                    console.log('Found userID in storage:', currentUserID);
+                    resolve(currentUserID);
+                } else {
+                    const timestamp = Date.now();
+                    const randomNumber = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+                    currentUserID = `${timestamp}-${randomNumber}`;
+                    chrome.storage.local.set({ userID: currentUserID }, () => {
+                        console.log('Generated and saved new userID:', currentUserID);
+                        resolve(currentUserID);
+                    });
+                }
+            });
+        });
+    }
+
     // Generic method to make API requests
     async makeRequest(endpoint, method = 'GET', data = null) {
+        const userID = await this.getOrSetUserID();
+        let requestData = data ? { ...data } : {}; // Clone data or create new object
+
+        // Add userID to the request data
+        requestData.userID = userID;
+
         const url = `${this.baseUrl}${endpoint}`;
         const options = {
             method,
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: data ? JSON.stringify(data) : null,
+            body: JSON.stringify(requestData), // Always stringify requestData, even for GET
         };
 
+        // For GET requests, if the original data was null, body might not be appropriate.
+        // However, to consistently send userID, we'll include it in the body for all methods.
+        // If specific GET endpoints cannot accept a body, this might need adjustment
+        // or userID could be added as a query parameter for GET.
+        // For now, we proceed with including it in the body.
+
         try {
-            console.log(`Making ${method} request to ${url}`, data);
+            console.log(`Making ${method} request to ${url}`, requestData);
             const response = await fetch(url, options);
             
             if (!response.ok) {

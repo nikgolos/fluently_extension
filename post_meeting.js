@@ -382,7 +382,6 @@ Speaking Time: ${speakingTimeElement.textContent}
 Total Words: ${totalWordsElement.textContent}
 Words Per Minute: ${wpmElement.textContent}${garbageWordsText}
 
-Shared from Fluently Meeting Transcriber
 `;
       
       // Try to use the Web Share API if available
