@@ -14,8 +14,8 @@ let lastSavedLength = 0;
 // For language detection
 let wordCount = 0;
 let hasCheckedLanguage = false;
-const LANGUAGE_DETECTION_WORD_THRESHOLD = 40;
-const LANGUAGE_DETECTION_SAMPLE_SIZE = 20;
+const LANGUAGE_DETECTION_WORD_THRESHOLD = 50;
+const LANGUAGE_DETECTION_SAMPLE_SIZE = 50;
 const LANGUAGE_DETECTION_CONFIDENCE_THRESHOLD = 59;
 // Flag to mark if current call is non-English
 let isCurrentCallEnglish = true;
