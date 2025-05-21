@@ -191,6 +191,10 @@ document.addEventListener('DOMContentLoaded', () => {
   
   // View transcripts button handler
   viewTranscriptsButton.addEventListener('click', () => {
+    // Try direct approach first
+    chrome.tabs.create({ url: 'transcripts.html' });
+    
+    // Also send message to background script as a fallback
     chrome.runtime.sendMessage({ type: 'openTranscriptsPage' });
   });
 
