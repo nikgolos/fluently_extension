@@ -114,15 +114,15 @@ document.addEventListener('DOMContentLoaded', () => {
       // Add each transcript to the list
       transcripts.forEach(transcript => {
         const preview = transcript.text.substring(0, 100) + (transcript.text.length > 100 ? '...' : '');
-        const meetingInfo = transcript.meetingId ? ` - Meeting: ${transcript.meetingId}` : '';
+        const meetingInfo = transcript.meetingId ? ` Meeting id: ${transcript.meetingId}` : '';
         const recoveredBadge = transcript.recovered ? '<span class="recovered-badge">Recovered</span>' : '';
         
         const transcriptItem = document.createElement('div');
         transcriptItem.className = 'transcript-item';
         transcriptItem.dataset.id = transcript.id;
         transcriptItem.innerHTML = `
-          <div class="transcript-date">${transcript.formattedDate}${meetingInfo} ${recoveredBadge}</div>
-          <div class="transcript-preview">${preview}</div>
+          <div class="transcript-date">${transcript.formattedDate} ${recoveredBadge}</div>
+          <div class="transcript-preview">${meetingInfo}</div>
         `;
         
         transcriptItem.addEventListener('click', () => {
@@ -131,9 +131,8 @@ document.addEventListener('DOMContentLoaded', () => {
           
           // Update the view
           const meetingLabel = transcript.meetingId ? `<span class="meeting-id">Meeting: ${transcript.meetingId}</span>` : '';
-          transcriptTitle.innerHTML = `Transcript from ${transcript.formattedDate} ${meetingLabel}`;
+          transcriptTitle.innerHTML = `Call from ${transcript.formattedDate} ${meetingLabel}`;
           transcriptTime.textContent = `Recorded at ${new Date(transcript.timestamp).toLocaleTimeString()}`;
-          transcriptContent.textContent = transcript.text;
           
           // Show the view
           transcriptView.style.display = 'block';

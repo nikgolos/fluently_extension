@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Saved Transcripts</title>
+  <title>Calls History</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -145,11 +145,11 @@
   </style>
 </head>
 <body>
-  <h1>Saved Transcripts</h1>
+  <h1>Calls History</h1>
   
   <div class="toolbar">
-    <button id="clearAllBtn">Clear All Transcripts</button>
-    <button id="downloadCurrentBtn" disabled>Download Current Transcript</button>
+    <button id="clearAllBtn">Clear All Calls</button>
+    <button id="downloadCurrentBtn" disabled>Download Current Call</button>
   </div>
   
   <div class="transcript-list" id="transcriptList">
@@ -160,7 +160,6 @@
   <div class="transcript-view" id="transcriptView" style="display: none;">
     <h2 id="transcriptTitle">Transcript</h2>
     <div class="transcript-time" id="transcriptTime"></div>
-    <hr>
     <div class="transcript-content" id="transcriptContent"></div>
   </div>
 
