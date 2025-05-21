@@ -3,129 +3,333 @@
 <head>
   <title>Google Meet English Checker</title>
   <style>
-    body {
-      width: 300px;
-      font-family: Arial, sans-serif;
-      padding: 10px;
+    :root {
+      --primary: #58CC02;
+      --primary-dark: #46A302;
+      --primary-light: #D7FFB8;
+      --secondary: #1CB0F6;
+      --secondary-light: #E5F8FF;
+      --white: #ffffff;
+      --text: #3C3C3C;
+      --text-light: #777777;
+      --error: #FF4B4B;
+      --warning: #FFC800;
+      --disabled: #E5E5E5;
+      --font: 'Google Sans', 'Roboto', sans-serif;
+      --shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      --radius: 16px;
     }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      width: 340px;
+      font-family: var(--font);
+      background: #F7F7F7;
+      color: var(--text);
+      margin: 0;
+      padding: 0;
+    }
+    
     .container {
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      align-items: center;
+      gap: 16px;
+      padding-bottom: 16px;
     }
-    .button-group {
-      display: flex;
-      gap: 10px;
-    }
-    button {
-      padding: 8px 16px;
-      cursor: pointer;
-      background-color: #4285f4;
-      color: white;
-      border: none;
-      border-radius: 4px;
-    }
-    button:hover {
-      background-color: #3367d6;
-    }
-    button:disabled {
-      background-color: #cccccc;
-      cursor: not-allowed;
-    }
-    .status {
-      padding: 8px 10px;
-      border-radius: 4px;
-      background-color: #f0f0f0;
-      text-align: center;
-      font-weight: bold;
-    }
-    .status.recording {
-      background-color: #ffd0d0;
-      color: #d32f2f;
-    }
-    .status.transcribing {
-      background-color: #d0f0ff;
-      color: #0277bd;
-    }
-    #debugArea {
-      padding: 10px;
-      background-color: #f0f0f0;
-      border-radius: 4px;
-      height: 60px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-    .view-transcripts {
-      margin-top: 10px;
-      text-align: center;
-    }
-    .auto-detect-info {
-      font-size: 12px;
-      color: #4285f4;
-      margin: 5px 0;
-      text-align: center;
-      font-style: italic;
-      background-color: #e8f0fe;
-      padding: 6px;
-      border-radius: 4px;
-      border-left: 3px solid #4285f4;
-    }
+    
     .header {
+      width: 100%;
+      background: var(--white);
+      padding: 16px;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: 10px;
+      gap: 8px;
+      box-shadow: var(--shadow);
+      position: relative;
     }
+    
     .header img {
       width: 24px;
       height: 24px;
-      margin-right: 8px;
     }
-    .section-title {
-      font-size: 15px;
-      font-weight: bold;
-      margin-top: 12px;
+    
+    .header h1 {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    
+    .status-container {
+      margin: 20px 0px 12px 0px;
+      width: 100%;
+      padding: 0 16px;
+    }
+    
+    .status-card {
+      background: var(--white);
+      border-radius: var(--radius);
+      padding: 16px;
+      width: 100%;
+      margin-bottom: 12px;
+      box-shadow: var(--shadow);
+    }
+    
+    .status-message {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .status-message:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+    
+    .status-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      min-width: 32px;
+      border-radius: 50%;
+      margin-right: 12px;
+    }
+    
+    .status-icon.info {
+      background: var(--secondary-light);
+      color: var(--secondary);
+    }
+    
+    .status-icon.warning {
+      background: rgba(255, 200, 0, 0.15);
+      color: var(--warning);
+    }
+    
+    .status-icon.not-meet-page {
+      background: rgba(255, 200, 0, 0.15);
+      color: var(--warning);
+    }
+    
+    .status-icon.recording {
+      background: rgba(255, 75, 75, 0.15);
+      color: var(--error);
+    }
+    
+    .status-icon.ready {
+      background: rgba(88, 204, 2, 0.15);
+      color: var(--primary);
+    }
+    
+    .pulse {
+      animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+      0% { opacity: 0.6; transform: scale(0.95); }
+      50% { opacity: 1; transform: scale(1.05); }
+      100% { opacity: 0.6; transform: scale(0.95); }
+    }
+    
+    .status-content {
+      flex: 1;
+    }
+    
+    .status-title {
+      font-size: 14px;
+      font-weight: 600;
       margin-bottom: 4px;
-      color: #333;
+      color: var(--text);
     }
-    #languageLogsArea {
-      padding: 10px;
-      background-color: #f5f5f5;
-      border-radius: 4px;
-      border-left: 3px solid #0277bd;
-      height: 60px;
+    
+    .status-text {
+      font-size: 13px;
+      color: var(--text-light);
+      line-height: 1.4;
+    }
+    
+    #status {
+      font-size: 13px;
+      color: var(--text-light);
+      line-height: 1.4;
+    }
+    
+    #status.recording {
+      color: var(--error);
+      font-weight: 500;
+    }
+    
+    #status.transcribing {
+      color: var(--green);
+      font-weight: 500;
+    }
+    
+    .primary-button {
+      background: var(--primary);
+      color: var(--white);
+      border: none;
+      border-radius: var(--radius);
+      font-family: var(--font);
+      font-size: 15px;
+      font-weight: 700;
+      padding: 14px 16px;
+      width: 100%;
+      cursor: pointer;
+      box-shadow: 0 4px 0 var(--primary-dark);
+      transition: all 0.1s ease;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .primary-button:hover {
+      filter: brightness(1.05);
+      transform: translateY(-1px);
+    }
+    
+    .primary-button:active {
+      box-shadow: 0 2px 0 var(--primary-dark);
+      transform: translateY(2px);
+    }
+    
+    .button-container {
+      width: 100%;
+      padding: 0 16px;
+    }
+    
+    /* Hidden sections */
+    #languageLogsSection, #debugInfoSection {
+      display: none;
+      width: 100%;
+      padding: 0 16px;
+      margin-top: 8px;
+    }
+    
+    .debug-card {
+      background: var(--white);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      margin-bottom: 12px;
+    }
+    
+    .debug-header {
+      background: var(--secondary);
+      color: var(--white);
+      padding: 12px 16px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    
+    .log-container {
+      padding: 12px;
+      height: 65px;
       overflow-y: auto;
-      font-family: monospace;
+      background: var(--white);
+    }
+    
+    #languageLogsArea, #debugArea {
+      font-family: 'Roboto Mono', monospace;
       font-size: 12px;
       white-space: pre-wrap;
       word-break: break-word;
+      color: var(--text-light);
     }
+    
     .log-entry {
       margin-bottom: 4px;
       padding: 2px 0;
       border-bottom: 1px solid #eaeaea;
+    }
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    
+    ::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 10px;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 10px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+      background: #a0a0a0;
     }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <img src="icon48.png" alt="Logo">
-      <h2>Google Meet English Checker</h2>
-    </div>
-    <div class="auto-detect-info">Make a Google Meet call in English to get your feedback</div>
-    <div id="status" class="status">Ready</div>
-    <div class="view-transcripts">
-      <button id="viewTranscriptsButton">View Saved Transcripts</button>
+      <img src="icon48.png" alt="Logo" id="logoIcon">
+      <h1>Google Meet English Checker</h1>
     </div>
     
-    <div class="section-title">Language Detection Logs</div>
-    <div id="languageLogsArea"></div>
+    <div class="status-container">
+      <div class="status-card">
+        <div class="status-message">
+          <div class="status-icon info">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 15c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1s1 .45 1 1v4c0 .55-.45 1-1 1zm1-8h-2V7h2v2z"/>
+            </svg>
+          </div>
+          <div class="status-content">
+            <div class="status-title">Make call in English</div>
+            <div class="status-text">Make a Google Meet call in English to get your feedback</div>
+          </div>
+        </div>
+        
+        <div class="status-message">
+          <div class="status-icon not-meet-page" id="statusIcon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 0v12l8.8 3.2c.7-1.3 1.2-2.8 1.2-4.2 0-5.5-4.5-10-10-10z"/>
+            </svg>
+          </div>
+          <div class="status-content">
+            <div class="status-title">Status</div>
+            <div class="status-text" id="status">Ready</div>
+          </div>
+        </div>
+      </div>
+    </div>
     
-    <div class="section-title">Debug Info</div>
-    <div id="debugArea"></div>
+    <div class="button-container">
+      <button class="primary-button" id="viewTranscriptsButton">View Transcripts</button>
+    </div>
+    
+    <div id="languageLogsSection">
+      <div class="debug-card">
+        <div class="debug-header">Language Detection Logs</div>
+        <div class="log-container">
+          <div id="languageLogsArea"></div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="debugInfoSection">
+      <div class="debug-card">
+        <div class="debug-header">Debug Info</div>
+        <div class="log-container">
+          <div id="debugArea"></div>
+        </div>
+      </div>
+    </div>
   </div>
+  
   <script src="popup.js"></script>
+  <script src="popup_init.js"></script>
 </body>
 </html> 
