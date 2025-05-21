@@ -105,12 +105,12 @@ async function checkLanguageIsEnglish(text) {
   const requestBody = JSON.stringify(payload);
   
   try {
-    console.log("[Language Detection] Sending API request to https://fluently-extension-backend-c1f2cc68e5b2.herokuapp.com/detect_language");
+    console.log("[Language Detection] Sending API request to https://duo-extension-backend-c967e08eb592.herokuapp.com/detect_language");
     console.log("[Language Detection] Request body:", requestBody);
     sendLanguageDetectionLog("Sending API request...");
     sendLanguageDetectionLog(`Request body: ${requestBody}`);
     
-    const response = await fetch('https://fluently-extension-backend-c1f2cc68e5b2.herokuapp.com/detect_language', {
+    const response = await fetch('https://duo-extension-backend-c967e08eb592.herokuapp.com/detect_language', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -347,10 +347,6 @@ function isMeetingActive() {
   const foundIndicators = meetingEndedIndicators
     .map((el, index) => el ? index : -1)
     .filter(i => i >= 0);
-  
-  if (foundIndicators.length > 0) {
-    console.log(`Meeting end indicators found: ${foundIndicators.join(', ')}`);
-  }
   
   // If any of these elements exist, the meeting has ended
   const meetingEnded = meetingEndedIndicators.some(element => element !== null);
@@ -915,7 +911,6 @@ function startRecording() {
 
       recognition.onresult = (event) => {
         // Log raw results for debugging
-        console.log('Speech recognition results:', event.results);
         
         let finalTranscript = '';
         let interimTranscript = '';
@@ -1223,7 +1218,7 @@ window.addEventListener('beforeunload', (event) => {
         // This is a synchronous request which is normally bad practice,
         // but we need it for the beforeunload event
         const xhr = new XMLHttpRequest();
-        xhr.open('POST', 'https://fluently-extension-backend-c1f2cc68e5b2.herokuapp.com/detect_language', false); // false makes it synchronous
+        xhr.open('POST', 'https://duo-extension-backend-c967e08eb592.herokuapp.com/detect_language', false); // false makes it synchronous
         xhr.setRequestHeader('Content-Type', 'application/json');
         xhr.send(JSON.stringify({ text: textToCheck }));
         
@@ -1546,7 +1541,6 @@ function startStandardRecognition() {
     };
 
     recognition.onresult = (event) => {
-      console.log('Speech recognition results:', event.results);
       
       let finalTranscript = '';
       let interimTranscript = '';

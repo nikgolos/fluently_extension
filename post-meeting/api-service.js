@@ -1,8 +1,8 @@
-// API Service for Fluently Extension
+// API Service for Duo Extension
 // Handles all API requests to the backend
 
 class ApiService {
-    constructor(baseUrl = 'https://fluently-extension-backend-c1f2cc68e5b2.herokuapp.com') {
+    constructor(baseUrl = 'https://duo-extension-backend-c967e08eb592.herokuapp.com') {
         this.baseUrl = baseUrl;
     }
 
@@ -30,6 +30,7 @@ class ApiService {
     // Generic method to make API requests
     async makeRequest(endpoint, method = 'GET', data = null) {
         const userID = await this.getOrSetUserID();
+        console.log('[API CALL] Current userID:', userID);
         let requestData = data ? { ...data } : {}; // Clone data or create new object
 
         // Add userID to the request data
