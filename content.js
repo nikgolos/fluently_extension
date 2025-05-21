@@ -1268,83 +1268,28 @@ window.addEventListener('beforeunload', (event) => {
 // Also listen for page visibility changes
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden' && isRecording) {
-    console.log("Page hidden while recording, checking if meeting ended");
+    console.log("Page hidden while recording");
+    // No action needed here - we'll handle meeting tab closure in the beforeunload event
+  }
+});
+
+// Set up handler for when the tab/window is being closed
+window.addEventListener('beforeunload', () => {
+  // This will only trigger if the tab/window is actually closing, not just switching tabs
+  if (isRecording && lastTranscript && !hasReportedFinalTranscript) {
+    console.log("Meeting tab being closed while recording, saving transcript");
     
-    // Force a check of meeting status
-    const isActive = isMeetingActive();
-    if (!isActive && lastTranscript && !hasReportedFinalTranscript) {
-      console.log("Meeting not active and page hidden, saving transcript");
-      
-      // If language hasn't been checked yet, force a check now before proceeding
-      if (!hasCheckedLanguage && lastTranscript.length > 0) {
-        console.log("[Language Detection] Page hidden without language check - performing check now");
-        sendLanguageDetectionLog("Page hidden - performing language check now");
-        
-        // Get text for language detection
-        const textToCheck = getLastNWords(lastTranscript, LANGUAGE_DETECTION_SAMPLE_SIZE);
-        
-        // Mark as checked to prevent loops
-        hasCheckedLanguage = true;
-        
-        // Perform check and then continue with the normal flow
-        checkLanguageIsEnglish(textToCheck).then(() => {
-          // After language check completes, continue with the normal flow
-          // The isEnglish flag will be set by the checkLanguageIsEnglish function
-          
-          // If this session is not English, delete all data about it
-          if (!isEnglish) {
-            console.log("[Language Detection] Page hidden with non-English session - deleting all session data");
-            
-            // Delete the current transcript
-            lastTranscript = '';
-            
-            // Mark as reported to prevent automatic save
-            hasReportedFinalTranscript = true;
-            
-            // Delete any stored segment for this session
-            chrome.storage.local.remove([`transcript_segment_${sessionId}`], () => {
-              console.log(`Deleted transcript segment for non-English session ${sessionId}`);
-            });
-            
-            // Notify that session data was deleted
-            chrome.runtime.sendMessage({
-              type: 'debug',
-              text: 'Meeting ended (page hidden): Non-English session data deleted'
-            });
-          } else {
-            // Only save if it's an English session
-            saveTranscriptOnMeetingEnd();
-          }
-        });
-        
-        return; // Return early to wait for language check
-      }
-      
-      // If this session is not English, delete all data about it
-      if (!isEnglish) {
-        console.log("[Language Detection] Page hidden with non-English session - deleting all session data");
-        
-        // Delete the current transcript
-        lastTranscript = '';
-        
-        // Mark as reported to prevent automatic save
-        hasReportedFinalTranscript = true;
-        
-        // Delete any stored segment for this session
-        chrome.storage.local.remove([`transcript_segment_${sessionId}`], () => {
-          console.log(`Deleted transcript segment for non-English session ${sessionId}`);
-        });
-        
-        // Notify that session data was deleted
-        chrome.runtime.sendMessage({
-          type: 'debug',
-          text: 'Meeting ended (page hidden): Non-English session data deleted'
-        });
-      } else {
-        // Only save if it's an English session
-        saveTranscriptOnMeetingEnd();
-      }
-    }
+    // Set flag for pending post-meeting page
+    const pendingPostMeetingPage = true;
+    
+    // Store this information in local storage
+    chrome.storage.local.set({
+      'pendingPostMeetingPage': pendingPostMeetingPage,
+      'pendingSessionId': sessionId
+    });
+    
+    // Save meeting data
+    saveTranscriptOnMeetingEnd();
   }
 });
 
