@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Google Meet English Checker",
   "version": "1.0",
-  "description": "Check your English mistakes on your Google Meet calls",
+  "description": "Check mistakes in your English on Google Meet calls",
   "permissions": [
     "activeTab",
     "storage",
