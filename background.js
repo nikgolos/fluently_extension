@@ -5,7 +5,7 @@ let isRecordingStopped = false;
 let pendingInjections = {};
 let currentSessionId = null;
 let sessionIdProcessed = null;
-let transcriptPageOpened = false;
+let sessionSpecificFlags = {};
 
 function sendDebugMessage(message) {
   console.log("DEBUG:", message);
@@ -398,17 +398,22 @@ function saveTranscriptToStorage(text, sender, sessionId, meetingCode, isEnglish
           createTemporaryTabForStats(transcriptEntry);
         }
         
+        // Check if we've already opened a post-meeting page for this specific session
+        const hasOpenedPageForThisSession = sessionSpecificFlags[transcriptEntry.sessionId || transcriptEntry.id];
+        
         // Notify user that the transcript is ready to view, but only if we haven't
-        // already opened a transcript page for this session and the session is in English
-        if (!transcriptPageOpened && transcriptEntry.isEnglish === true) {
+        // already opened a transcript page for this specific session and the session is in English
+        if (!hasOpenedPageForThisSession && transcriptEntry.isEnglish === true) {
           console.log("Opening post-meeting stats page for session", transcriptEntry.sessionId);
           chrome.tabs.create({ url: `post_meeting.html?id=${transcriptEntry.id || transcriptEntry.sessionId}` });
-          transcriptPageOpened = true;
           
-          // Reset the flag after a certain period to allow new tabs for future sessions
+          // Mark this specific session as having its page opened
+          sessionSpecificFlags[transcriptEntry.sessionId || transcriptEntry.id] = true;
+          
+          // Reset the flag for this session after a certain period to allow new tabs for future sessions
           setTimeout(() => {
-            transcriptPageOpened = false;
-            console.log("Reset transcriptPageOpened flag");
+            delete sessionSpecificFlags[transcriptEntry.sessionId || transcriptEntry.id];
+            console.log("Reset page opened flag for session", transcriptEntry.sessionId || transcriptEntry.id);
           }, 30000); // Reset after 30 seconds
         } else if (transcriptEntry.isEnglish !== true) {
           console.log("Not opening post-meeting stats page because session is not confirmed as English:", transcriptEntry.isEnglish);
