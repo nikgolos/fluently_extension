@@ -13,20 +13,20 @@ document.addEventListener('DOMContentLoaded', () => {
   transcriptStats.className = 'transcript-stats';
   transcriptStats.innerHTML = `
     <div class="stat-card">
-      <div class="stat-title">Total Words</div>
-      <div class="stat-value" id="totalWordsValue">-</div>
+      <div class="stat-title">English Score</div>
+      <div class="stat-value" id="englishScoreValue">-</div>
     </div>
     <div class="stat-card">
-      <div class="stat-title">Unique Words</div>
-      <div class="stat-value" id="uniqueWordsValue">-</div>
+      <div class="stat-title">Fluency Score</div>
+      <div class="stat-value" id="fluencyScoreValue">-</div>
     </div>
     <div class="stat-card">
-      <div class="stat-title">Words Per Minute</div>
-      <div class="stat-value" id="wpmValue">-</div>
+      <div class="stat-title">Grammar Score</div>
+      <div class="stat-value" id="grammarScoreValue">-</div>
     </div>
     <div class="stat-card">
-      <div class="stat-title">Meeting Duration</div>
-      <div class="stat-value" id="meetingLengthValue">-</div>
+      <div class="stat-title">Vocabulary Score</div>
+      <div class="stat-value" id="vocabularyScoreValue">-</div>
     </div>
     <div class="stat-card">
       <div class="stat-title">Your Speaking Time</div>
@@ -165,10 +165,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // Load transcript statistics
   function loadTranscriptStats(transcriptId) {
     // Reset stats display
-    document.getElementById('totalWordsValue').textContent = '-';
-    document.getElementById('uniqueWordsValue').textContent = '-';
-    document.getElementById('wpmValue').textContent = '-';
-    document.getElementById('meetingLengthValue').textContent = '-';
+    document.getElementById('englishScoreValue').textContent = '-';
+    document.getElementById('fluencyScoreValue').textContent = '-';
+    document.getElementById('grammarScoreValue').textContent = '-';
+    document.getElementById('vocabularyScoreValue').textContent = '-';
     document.getElementById('speakingTimeValue').textContent = '-';
     
     // Check if stats module is loaded
@@ -194,49 +194,25 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("Retrieved stored stats for transcript:", transcriptId, stats);
         
         // Update UI with the stats
-        document.getElementById('totalWordsValue').textContent = stats.total_words || '-';
-        document.getElementById('uniqueWordsValue').textContent = stats.unique_words_amount;
-        
-        // Ensure WPM is never 0 if we have words
-        if ((stats.words_per_minute === 0 || !stats.words_per_minute) && stats.total_words > 0) {
-          // Calculate a reasonable WPM using the speaking time
-          if (stats.speaking_time_seconds && stats.speaking_time_seconds > 0) {
-            const wpm = Math.round((stats.total_words / stats.speaking_time_seconds) * 60);
-            document.getElementById('wpmValue').textContent = wpm;
-          } else {
-            // Fallback to a default value if no speaking time available
-            document.getElementById('wpmValue').textContent = '60';
-          }
-        } else {
-          document.getElementById('wpmValue').textContent = stats.words_per_minute;
-        }
-        
-        document.getElementById('meetingLengthValue').textContent = stats.meeting_length || '-';
+        document.getElementById('englishScoreValue').textContent = stats.englishScore ? `${stats.englishScore} out 100` : '-';
+        document.getElementById('fluencyScoreValue').textContent = stats.fluencyScore ? `${stats.fluencyScore}%` : '-';
+        document.getElementById('grammarScoreValue').textContent = stats.grammarScore ? `${stats.grammarScore}%` : '-';
+        document.getElementById('vocabularyScoreValue').textContent = stats.vocabularyScore ? `${stats.vocabularyScore}%` : '-';
         document.getElementById('speakingTimeValue').textContent = stats.speaking_time || '-';
       } else {
         console.log("No stored stats found, calculating on the fly for:", currentTranscript?.id);
         // Calculate stats on the fly if not found
         if (currentTranscript) {
           const calculatedStats = TranscriptStats.calculateTranscriptStats(currentTranscript);
-          document.getElementById('totalWordsValue').textContent = calculatedStats.total_words;
-          document.getElementById('uniqueWordsValue').textContent = calculatedStats.unique_words_amount;
           
-          // Ensure WPM is never 0 if we have words
-          if ((calculatedStats.words_per_minute === 0 || !calculatedStats.words_per_minute) && calculatedStats.total_words > 0) {
-            // Calculate WPM using the speaking time
-            if (calculatedStats.speaking_time_seconds && calculatedStats.speaking_time_seconds > 0) {
-              const wpm = Math.round((calculatedStats.total_words / calculatedStats.speaking_time_seconds) * 60);
-              document.getElementById('wpmValue').textContent = wpm;
-            } else {
-              // Fallback to a default value if no speaking time available
-              document.getElementById('wpmValue').textContent = '60';
-            }
-          } else {
-            document.getElementById('wpmValue').textContent = calculatedStats.words_per_minute;
-          }
+          // Basic stats are calculated on the fly
+          document.getElementById('speakingTimeValue').textContent = calculatedStats.speaking_time || '-';
           
-          document.getElementById('meetingLengthValue').textContent = calculatedStats.meeting_length;
-          document.getElementById('speakingTimeValue').textContent = calculatedStats.speaking_time;
+          // The API-based scores might not be available without API call
+          document.getElementById('englishScoreValue').textContent = '-';
+          document.getElementById('fluencyScoreValue').textContent = calculatedStats.fluency_score ? `${calculatedStats.fluency_score}%` : '-';
+          document.getElementById('grammarScoreValue').textContent = '-';
+          document.getElementById('vocabularyScoreValue').textContent = '-';
         }
       }
     });

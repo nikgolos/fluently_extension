@@ -1059,6 +1059,39 @@ async function loadGeneralStats() {
         // Process and display stats data (this will repopulate .general-cards)
         displayGeneralStats(statsData);
         
+        // Save scores to transcript_stats storage
+        let englishScore = statsData.general_score || statsData.english_score || 0;
+        englishScore = Math.round((frontendStats.fluency_score - englishScore)/4 + englishScore);
+        
+        let fluencyScore = frontendStats && frontendStats.fluency_score !== undefined ? 
+            frontendStats.fluency_score : (statsData.fluency_score || 47);
+            
+        let grammarScore = statsData.grammar_score || 80;
+        let vocabularyScore = statsData.vocabulary_score || 74;
+        
+        // Save these scores to transcript_stats
+        chrome.storage.local.get(['transcript_stats'], (result) => {
+            const allStats = result.transcript_stats || {};
+            if (!allStats[transcriptId]) {
+                allStats[transcriptId] = {};
+            }
+            
+            // Update scores in storage
+            allStats[transcriptId].englishScore = englishScore;
+            allStats[transcriptId].fluencyScore = fluencyScore;
+            allStats[transcriptId].grammarScore = grammarScore;
+            allStats[transcriptId].vocabularyScore = vocabularyScore;
+            
+            chrome.storage.local.set({ transcript_stats: allStats }, () => {
+                console.log('Saved scores to transcript_stats:', {
+                    englishScore,
+                    fluencyScore,
+                    grammarScore,
+                    vocabularyScore
+                });
+            });
+        });
+        
         // Hide loader (it was placed in generalCardsContainer or generalTabBody)
         hideTabLoader(generalCardsContainer ? '.general-tab-body .general-cards' : '.general-tab-body');
         isLoading = false;
