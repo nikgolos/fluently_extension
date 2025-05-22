@@ -366,13 +366,6 @@ async function loadGrammarData() {
         // Process and display grammar data
         displayGrammarData(grammarData);
         
-        // Update badge count
-        const mistakesCount = grammarData.grammar && grammarData.grammar.mistakes ? grammarData.grammar.mistakes.length : 0;
-        updateGrammarBadgeCount(mistakesCount);
-        
-        // Update paragraph text based on mistakes count
-        updateGrammarParagraph(mistakesCount);
-        
         // Hide loader
         hideTabLoader('.grammar-tab-body');
         isLoading = false;
@@ -398,31 +391,69 @@ function displayGrammarData(data) {
         return;
     }
     
+    // Apply filter to remove capitalization, hyphen, and comma mistakes
     const { mistakes } = data.grammar;
-    console.log(`Displaying ${mistakes.length} grammar mistakes`);
+    const filteredMistakes = filterGrammarMistakes(mistakes);
     
-    // Group mistakes by category
-    const categorizedMistakes = {};
+    console.log(`Displaying ${filteredMistakes.length} grammar mistakes (filtered from ${mistakes.length} total)`);
     
-    mistakes.forEach(mistake => {
-        // Use 'Other' as default category if category is missing
-        const category = mistake.category || 'Other';
-        
-        if (!categorizedMistakes[category]) {
-            categorizedMistakes[category] = [];
+    // Check if there are any mistakes after filtering
+    if (filteredMistakes.length === 0) {
+        grammarCards.innerHTML = '<div class="no-errors">No grammar mistakes found. Great job!</div>';
+        updateGrammarBadgeCount(0);
+        updateGrammarParagraph(0);
+        return;
+    }
+    
+    // Calculate number of warnings (35% of filtered mistakes, rounded down)
+    const warningsCount = Math.floor(filteredMistakes.length * 0.35);
+    console.log(`Calculated warnings count: ${warningsCount} (35% of ${filteredMistakes.length} filtered mistakes)`);
+    
+    // Split the filtered mistakes into top mistakes and warnings
+    const topMistakes = filteredMistakes.slice(0, filteredMistakes.length - warningsCount);
+    const warningMistakes = filteredMistakes.slice(filteredMistakes.length - warningsCount);
+    
+    console.log(`Split mistakes: ${topMistakes.length} for Top Mistakes, ${warningMistakes.length} for Warnings`);
+    
+    // Create "Top Mistakes" card with remaining mistakes
+    const topCard = createGrammarCard("Top Mistakes", topMistakes);
+    grammarCards.appendChild(topCard);
+    
+    // Create "Warnings" card
+    const warningsCard = createGrammarCard("Warnings", warningMistakes);
+    grammarCards.appendChild(warningsCard);
+    
+    // Update badge and paragraph with filtered count
+    updateGrammarBadgeCount(filteredMistakes.length);
+    updateGrammarParagraph(filteredMistakes.length);
+}
+
+// Filter grammar mistakes based on explanation text
+function filterGrammarMistakes(mistakes) {
+    if (!mistakes || !Array.isArray(mistakes)) {
+        return [];
+    }
+    
+    // Terms to filter out
+    const filterTerms = ['capitaliz', 'hyphen', 'comma'];
+    
+    // Filter out mistakes with explanations containing any of the filter terms
+    return mistakes.filter(mistake => {
+        if (!mistake.explanation) {
+            return true; // Keep mistakes without explanations
         }
-        categorizedMistakes[category].push(mistake);
-    });
-    
-    // Log categories and counts for debugging
-    Object.keys(categorizedMistakes).forEach(category => {
-        console.log(`Category: ${category}, Count: ${categorizedMistakes[category].length}`);
-    });
-    
-    // Create a card for each category
-    Object.keys(categorizedMistakes).forEach(category => {
-        const card = createGrammarCard(category, categorizedMistakes[category]);
-        grammarCards.appendChild(card);
+        
+        const explanation = mistake.explanation.toLowerCase();
+        
+        // Check if explanation contains any of the filter terms
+        for (const term of filterTerms) {
+            if (explanation.includes(term)) {
+                console.log(`Filtered out mistake: "${mistake.error}" - Explanation: "${mistake.explanation}"`);
+                return false;
+            }
+        }
+        
+        return true; // Keep mistakes that don't match filter terms
     });
 }
 
@@ -448,7 +479,13 @@ function createGrammarCard(category, mistakes) {
     // Create description
     const description = document.createElement('div');
     description.className = 'your-errors-in-using-verb-tenses-or-forms';
-    description.textContent = `Your errors in ${category.toLowerCase()}:`;
+    
+    // Different description text based on category
+    if (category === "Warnings") {
+        description.textContent = 'Less critical but still important to fix:';
+    } else {
+        description.textContent = `Most critical grammar mistakes:`;
+    }
     
     // Append elements
     text.appendChild(description);
@@ -460,11 +497,20 @@ function createGrammarCard(category, mistakes) {
     const errorsContainer = document.createElement('div');
     errorsContainer.className = 'grammar-errors';
     
-    // Add each mistake
-    mistakes.forEach(mistake => {
-        const errorElement = createGrammarError(mistake);
-        errorsContainer.appendChild(errorElement);
-    });
+    // Add each mistake if there are any
+    if (mistakes && mistakes.length > 0) {
+        mistakes.forEach(mistake => {
+            const errorElement = createGrammarError(mistake);
+            errorsContainer.appendChild(errorElement);
+        });
+    } else if (category === "Warnings") {
+        // Show empty state message for Warnings when no warnings
+        const emptyMessage = document.createElement('div');
+        emptyMessage.className = 'no-errors';
+        emptyMessage.style.padding = '10px';
+        emptyMessage.textContent = 'No warnings to display.';
+        errorsContainer.appendChild(emptyMessage);
+    }
     
     card.appendChild(errorsContainer);
     
@@ -529,7 +575,7 @@ function updateGrammarParagraph(mistakesCount) {
         if (mistakesCount === 0) {
             paragraph.textContent = 'Great job! No grammar mistakes found in your speech.';
         } else {
-            paragraph.textContent = 'Fix your mistakes with Articles and Verb Forms to improve your score.';
+            paragraph.textContent = 'Fix these grammar mistakes to improve your English score.';
         }
     }
 }
