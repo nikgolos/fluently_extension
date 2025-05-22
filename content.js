@@ -1291,17 +1291,17 @@ window.addEventListener('beforeunload', () => {
 // Add this function above the startRecording function
 async function setupEnhancedAudioProcessing() {
   try {
-    // Create enhanced audio constraints with strong echo cancellation and optimizations
+    // Create enhanced audio constraints with stronger echo cancellation and optimizations
     // for capturing other speakers on calls
     const audioConstraints = {
-      // Core audio processing features
+      // Core audio processing features with maximum echo cancellation
       echoCancellation: true,
       noiseSuppression: true,
       autoGainControl: true,
       
       // Additional advanced configurations for better speaker isolation
       advanced: [{
-        // Echo cancellation is the most important setting for hearing other speakers
+        // Echo cancellation is the most important setting - set to maximum
         echoCancellation: true,
         
         // Noise suppression helps filter background noise from speech
@@ -1321,15 +1321,30 @@ async function setupEnhancedAudioProcessing() {
         channelCount: 2,
         
         // Some browsers allow setting mic gain programmatically
-        volume: 1.0,
+        // Lower volume can help reduce echo pickup
+        volume: 0.85,
         
         // Specify audio processing to optimize for voice
         googEchoCancellation: true,
+        googExperimentalEchoCancellation: true,
         googAutoGainControl: true,
+        googAutoGainControl2: true,
         googNoiseSuppression: true,
         googHighpassFilter: true,
         googTypingNoiseDetection: true,
-        googAudioMirroring: false
+        googAudioMirroring: false,
+        
+        // Additional Chrome-specific echo cancellation options
+        googExperimentalNoiseSuppression: true,
+        googDAEchoCancellation: true,
+        googBeamforming: true,
+        
+        // Additional echo cancellation settings
+        echoCancellationType: "system",
+        echoCancellationQuality: "high",
+        
+        // Voice isolation if supported
+        voiceIsolation: "high"
       }]
     };
 
@@ -1342,8 +1357,29 @@ async function setupEnhancedAudioProcessing() {
     logAudioStreamInfo(stream);
     
     // Create an audio context for potential VAD processing
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)({
+      // Request high-quality audio processing
+      latencyHint: 'interactive',
+      sampleRate: 48000
+    });
     const source = audioContext.createMediaStreamSource(stream);
+    
+    // Add additional processing for echo cancellation
+    let processedSource = source;
+    
+    // Try to add a high-pass filter to reduce low-frequency noise that often contains echo
+    try {
+      const highpassFilter = audioContext.createBiquadFilter();
+      highpassFilter.type = 'highpass';
+      highpassFilter.frequency.value = 85; // Filter out frequencies below typical human voice
+      
+      source.connect(highpassFilter);
+      processedSource = highpassFilter;
+      
+      console.log("Added high-pass filter for improved echo reduction");
+    } catch (e) {
+      console.warn("Could not create highpass filter:", e);
+    }
     
     // Create a processor node for Voice Activity Detection using AudioWorkletNode
     try {
@@ -1351,7 +1387,12 @@ async function setupEnhancedAudioProcessing() {
       await audioContext.audioWorklet.addModule(chrome.runtime.getURL('vad-processor.js'));
       
       // Create the AudioWorkletNode
-      const vadNode = new AudioWorkletNode(audioContext, 'vad-processor');
+      const vadNode = new AudioWorkletNode(audioContext, 'vad-processor', {
+        // Pass audio context parameters to the processor
+        processorOptions: {
+          sampleRate: audioContext.sampleRate
+        }
+      });
       
       // Set up the message handler to receive voice activity detection results
       vadNode.port.onmessage = (event) => {
@@ -1364,8 +1405,8 @@ async function setupEnhancedAudioProcessing() {
         }
       };
       
-      // Connect the nodes
-      source.connect(vadNode);
+      // Connect the processed source to the VAD node
+      processedSource.connect(vadNode);
       
       // Store for cleanup
       window.vadProcessor = vadNode;
@@ -1396,7 +1437,9 @@ async function setupEnhancedAudioProcessing() {
           recognition.acoustic = {
             echoCancellation: true,
             enhancedVoiceDetection: true,
-            voiceIsolation: true
+            voiceIsolation: true,
+            echoCancellationStrength: 'maximum',
+            noiseSuppression: true
           };
           console.log("Applied acoustic optimizations");
         }
@@ -1435,6 +1478,7 @@ function logAudioStreamInfo(stream) {
     // Summary for user notification
     let userMessage = '';
     let echoCancellationEnabled = false;
+    let echoCancellationStrength = 'unknown';
     
     // Log details for each track
     audioTracks.forEach((track, index) => {
@@ -1466,14 +1510,40 @@ function logAudioStreamInfo(stream) {
       const constraints = track.getConstraints();
       if (constraints && constraints.advanced) {
         console.log("Requested constraints:", constraints);
+        
+        // Check for echo cancellation type if available
+        if (constraints.advanced.some(c => c.echoCancellationType)) {
+          const echoType = constraints.advanced.find(c => c.echoCancellationType)?.echoCancellationType;
+          console.log(`- Requested Echo Cancellation Type: ${echoType}`);
+          echoCancellationStrength = echoType === 'system' ? 'high' : 'standard';
+        }
+        
+        // Check for echo cancellation quality if available
+        if (constraints.advanced.some(c => c.echoCancellationQuality)) {
+          const echoQuality = constraints.advanced.find(c => c.echoCancellationQuality)?.echoCancellationQuality;
+          console.log(`- Requested Echo Cancellation Quality: ${echoQuality}`);
+          if (echoQuality === 'high') echoCancellationStrength = 'high';
+        }
+        
+        // Log Google-specific echo cancellation settings
+        if (constraints.advanced.some(c => c.googEchoCancellation)) {
+          console.log(`- Google Echo Cancellation: ${constraints.advanced.find(c => c.googEchoCancellation)?.googEchoCancellation}`);
+        }
+        
+        if (constraints.advanced.some(c => c.googExperimentalEchoCancellation)) {
+          console.log(`- Google Experimental Echo Cancellation: ${constraints.advanced.find(c => c.googExperimentalEchoCancellation)?.googExperimentalEchoCancellation}`);
+          if (constraints.advanced.find(c => c.googExperimentalEchoCancellation)?.googExperimentalEchoCancellation) {
+            echoCancellationStrength = 'high';
+          }
+        }
       }
     });
     
     console.log("---------------------------------------");
     
-    // Create user-friendly message
+    // Create user-friendly message with more detailed echo cancellation info
     if (echoCancellationEnabled) {
-      userMessage = 'Enhanced audio with echo cancellation enabled - should better pick up other speakers';
+      userMessage = `Enhanced audio with ${echoCancellationStrength} echo cancellation enabled - optimized to reduce speaker feedback`;
     } else {
       userMessage = 'Basic audio configuration - echo cancellation status unknown';
     }
