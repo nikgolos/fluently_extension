@@ -88,22 +88,160 @@ async function initApp() {
         // Add event listeners to tabs
         setupTabListeners();
         
-        // --- REORDERED OPERATIONS START ---
-        // 1. Calculate and display frontend-based stats (including Fluency)
-        console.log("Starting frontend stats calculation...");
-        await loadAndDisplayFrontendStats();
-        console.log("Frontend stats calculation complete.");
+        // --- DATA LOADING AND CACHING LOGIC ---
+        console.log("Starting data loading and caching logic for transcriptId:", transcriptId);
+
+        // 1. Fetch initial stored data BEFORE frontend calculations
+        let initialStoredDataForTranscript = null;
+        await new Promise(resolve => {
+            chrome.storage.local.get(['transcript_stats'], (result) => {
+                const allStats = result.transcript_stats || {};
+                if (allStats[transcriptId]) {
+                    console.log('[initApp] Found initial stored data for transcriptId:', allStats[transcriptId]);
+                    initialStoredDataForTranscript = { ...allStats[transcriptId] }; // Shallow copy
+                } else {
+                    console.log('[initApp] No initial stored data found for transcriptId.');
+                }
+                resolve();
+            });
+        });
+
+        // 2. Calculate and display frontend-based stats (including Fluency)
+        // This might modify storage and sets global `frontendStats`
+        console.log("[initApp] Starting frontend stats calculation...");
+        await loadAndDisplayFrontendStats(); 
+        console.log("[initApp] Frontend stats calculation complete. Global frontendStats:", frontendStats);
+
+        // 3. Determine if all necessary API-derived data was present in `initialStoredDataForTranscript`
+        let wasApiDataInitiallyComplete = false;
+        if (initialStoredDataForTranscript &&
+            initialStoredDataForTranscript.api_englishScore !== undefined &&
+            initialStoredDataForTranscript.api_fluencyScore !== undefined && // Though often derived from frontend, check if API version was stored
+            initialStoredDataForTranscript.api_grammarScore !== undefined &&
+            initialStoredDataForTranscript.api_vocabularyScore !== undefined &&
+            initialStoredDataForTranscript.api_feedback !== undefined) {
+            // Note: we're not requiring api_summary anymore, only checking for api_feedback
+            wasApiDataInitiallyComplete = true;
+            console.log('[initApp] All API-derived general stats were present in initial storage.');
+        }
+
+        let wasGrammarDataInitiallyComplete = false;
+        if (initialStoredDataForTranscript && initialStoredDataForTranscript.grammarData) {
+            wasGrammarDataInitiallyComplete = true;
+            console.log('[initApp] Grammar data was present in initial storage.');
+        }
+
+        let wasVocabularyDataInitiallyComplete = false;
+        if (initialStoredDataForTranscript && initialStoredDataForTranscript.vocabularyData) {
+            wasVocabularyDataInitiallyComplete = true;
+            console.log('[initApp] Vocabulary data was present in initial storage.');
+        }
+
+        // 4. Load General Stats (English Score, etc.)
+        console.log("[initApp] Starting General tab stats loading...");
+        if (wasApiDataInitiallyComplete) {
+            console.log("[initApp] Using initially stored API stats for General tab.");
+            statsData = {
+                general_score: initialStoredDataForTranscript.api_englishScore,
+                english_score: initialStoredDataForTranscript.api_englishScore,
+                fluency_score: initialStoredDataForTranscript.api_fluencyScore, // Use API stored one first
+                grammar_score: initialStoredDataForTranscript.api_grammarScore,
+                vocabulary_score: initialStoredDataForTranscript.api_vocabularyScore,
+                summary: initialStoredDataForTranscript.api_summary || initialStoredDataForTranscript.api_feedback, // Use feedback as fallback
+                feedback: initialStoredDataForTranscript.api_feedback
+            };
+            // If frontend stats has a more up-to-date fluency score, prefer that for display
+            if (frontendStats && frontendStats.fluency_score !== undefined) {
+                statsData.fluency_score = frontendStats.fluency_score;
+            }
+            displayGeneralStats(statsData);
+        } else {
+            console.log("[initApp] API general stats not complete in initial storage. Calling loadGeneralStats() API...");
+            await loadGeneralStats(); // This will fetch from API and save (merging)
+        }
+        console.log("[initApp] General tab stats loading complete.");
+
+        // 5. Load Grammar Data
+        console.log("[initApp] Starting Grammar tab data loading...");
+        if (wasGrammarDataInitiallyComplete) {
+            console.log("[initApp] Using initially stored grammar data.");
+            grammarData = initialStoredDataForTranscript.grammarData;
+            displayGrammarData(grammarData);
+        } else {
+            console.log("[initApp] Grammar data not found in initial storage. Calling loadGrammarData() API...");
+            await loadGrammarData(); // Will fetch and save (merging)
+        }
+        console.log("[initApp] Grammar tab data loading complete.");
+
+        // 6. Load Vocabulary Data
+        console.log("[initApp] Starting Vocabulary tab data loading...");
+        if (wasVocabularyDataInitiallyComplete) {
+            console.log("[initApp] Using initially stored vocabulary data.");
+            vocabularyData = initialStoredDataForTranscript.vocabularyData;
+            displayVocabularyData(vocabularyData);
+            const suggestionsCount = countVocabularySuggestions(vocabularyData);
+            updateVocabularyBadgeCount(suggestionsCount);
+            updateVocabularyParagraph(suggestionsCount);
+        } else {
+            console.log("[initApp] Vocabulary data not found in initial storage. Calling loadVocabularyData() API...");
+            await loadVocabularyData(); // Will fetch and save (merging)
+        }
+        console.log("[initApp] Vocabulary tab data loading complete.");
         
-        // 2. Load stats for General tab (API based) - this includes /english_stats
-        console.log("Starting General tab API stats loading (/english_stats)...");
-        await loadGeneralStats();
-        console.log("General tab API stats loading complete.");
-        
-        // 3. Initialize Grammar and Vocabulary tabs by starting their data load (non-blocking)
-        console.log("Starting Grammar and Vocabulary tab API data loading (non-blocking)...");
-        loadGrammarData();    // Initiate Grammar API call
-        loadVocabularyData(); // Initiate Vocabulary API call
-        // --- REORDERED OPERATIONS END ---
+        // 7. Final re-save if data was initially complete, to ensure frontend calculations don't wipe API parts.
+        // This merges the critical API-derived data back if `loadAndDisplayFrontendStats` overwrote parts of the record.
+        if (wasApiDataInitiallyComplete || wasGrammarDataInitiallyComplete || wasVocabularyDataInitiallyComplete) {
+            console.log('[initApp] Re-saving initially complete data to ensure persistence after frontend calculations.');
+            await new Promise(resolve => {
+                chrome.storage.local.get(['transcript_stats'], (result) => {
+                    const allStatsForSave = result.transcript_stats || {};
+                    const currentDataForId = allStatsForSave[transcriptId] || {};
+                    let updatedData = { ...currentDataForId };
+
+                    if (wasApiDataInitiallyComplete) {
+                        updatedData.api_englishScore = initialStoredDataForTranscript.api_englishScore;
+                        updatedData.api_fluencyScore = initialStoredDataForTranscript.api_fluencyScore;
+                        updatedData.api_grammarScore = initialStoredDataForTranscript.api_grammarScore;
+                        updatedData.api_vocabularyScore = initialStoredDataForTranscript.api_vocabularyScore;
+                        if (initialStoredDataForTranscript.api_summary) {
+                            updatedData.api_summary = initialStoredDataForTranscript.api_summary;
+                        }
+                        updatedData.api_feedback = initialStoredDataForTranscript.api_feedback;
+                        
+                        // Preserve additional fluency stats if they exist
+                        if (initialStoredDataForTranscript.garbage_words) {
+                            updatedData.garbage_words = initialStoredDataForTranscript.garbage_words;
+                        }
+                        if (initialStoredDataForTranscript.total_words !== undefined) {
+                            updatedData.total_words = initialStoredDataForTranscript.total_words;
+                        }
+                        if (initialStoredDataForTranscript.words_per_minute !== undefined) {
+                            updatedData.words_per_minute = initialStoredDataForTranscript.words_per_minute;
+                        }
+                        if (initialStoredDataForTranscript.speaking_time_seconds !== undefined) {
+                            updatedData.speaking_time_seconds = initialStoredDataForTranscript.speaking_time_seconds;
+                        }
+                    }
+                    if (wasGrammarDataInitiallyComplete) {
+                        updatedData.grammarData = initialStoredDataForTranscript.grammarData;
+                    }
+                    if (wasVocabularyDataInitiallyComplete) {
+                        updatedData.vocabularyData = initialStoredDataForTranscript.vocabularyData;
+                    }
+                    // Also ensure frontend stats that are part of the primary display are there
+                    if (frontendStats && frontendStats.fluency_score !== undefined) {
+                         updatedData.fluencyScore = frontendStats.fluency_score; // This might be the same as api_fluencyScore or more recent
+                    }
+
+                    allStatsForSave[transcriptId] = updatedData;
+                    chrome.storage.local.set({ transcript_stats: allStatsForSave }, () => {
+                        console.log('[initApp] Final re-save complete. Current data for transcriptId:', allStatsForSave[transcriptId]);
+                        resolve();
+                    });
+                });
+            });
+        }
+        // --- END OF DATA LOADING AND CACHING LOGIC ---
         
     } catch (error) {
         console.error('Error initializing app:', error);
@@ -356,25 +494,56 @@ async function loadGrammarData() {
         showTabLoader('.grammar-tab-body');
         isLoading = true;
     
+        let useStoredData = false;
+        let storedGrammarData = null;
         
-        // Strip timestamps before sending to API
-        const cleanText = stripTimestamps(transcriptText);
+        await new Promise(resolve => {
+            chrome.storage.local.get(['transcript_stats'], (result) => {
+                const allStats = result.transcript_stats || {};
+                if (allStats[transcriptId] && allStats[transcriptId].grammarData) {
+                    console.log('Found stored grammar data for transcriptId:', transcriptId);
+                    storedGrammarData = allStats[transcriptId].grammarData;
+                    useStoredData = true;
+                } else {
+                    console.log('No stored grammar data found for transcriptId:', transcriptId);
+                }
+                resolve();
+            });
+        });
         
-        // Get grammar data from API
-        grammarData = await apiService.getGrammarAnalysis(cleanText);
+        if (useStoredData) {
+            console.log('Using stored grammar data instead of API call');
+            grammarData = storedGrammarData;
+        } else {
+            const cleanText = stripTimestamps(transcriptText);
+            const apiGrammarResponse = await apiService.getGrammarAnalysis(cleanText);
+            grammarData = apiGrammarResponse; // Use API response
+            
+            // Save grammar data to transcript_stats, merging with existing data
+            await new Promise(resolve => {
+                chrome.storage.local.get(['transcript_stats'], (result) => {
+                    const allStatsForSave = result.transcript_stats || {};
+                    const existingDataForId = allStatsForSave[transcriptId] || {};
+                    
+                    allStatsForSave[transcriptId] = {
+                        ...existingDataForId, // Preserve other data
+                        grammarData: apiGrammarResponse // Add/update grammarData
+                    };
+                    
+                    chrome.storage.local.set({ transcript_stats: allStatsForSave }, () => {
+                        console.log('Saved grammar data to transcript_stats by merging:', allStatsForSave[transcriptId]);
+                        resolve();
+                    });
+                });
+            });
+        }
         
-        // Process and display grammar data
         displayGrammarData(grammarData);
         
-        // Hide loader
         hideTabLoader('.grammar-tab-body');
         isLoading = false;
     } catch (error) {
         console.error('Error loading grammar data:', error);
-        // Keep showing the loader instead of error message if data failed to load
-        // grammarCards.innerHTML = '<div class="error">Error loading grammar analysis. Please try again.</div>';
-        
-        // Don't hide the loader to indicate we're still waiting for data
         isLoading = false;
     }
 }
@@ -587,11 +756,55 @@ async function loadVocabularyData() {
         showTabLoader('.vocabulary-tab-body');
         isLoading = true;
         
-        // Strip timestamps before sending to API
-        const cleanText = stripTimestamps(transcriptText);
+        // Check if we have vocabulary data in storage first
+        let useStoredData = false;
+        let storedVocabularyData = null;
         
-        // Get vocabulary data from API
-        vocabularyData = await apiService.getVocabularyAnalysis(cleanText);
+        // Get stored data from transcript_stats
+        await new Promise(resolve => {
+            chrome.storage.local.get(['transcript_stats'], (result) => {
+                const allStats = result.transcript_stats || {};
+                if (allStats[transcriptId] && allStats[transcriptId].vocabularyData) {
+                    console.log('Found stored vocabulary data for transcriptId:', transcriptId);
+                    storedVocabularyData = allStats[transcriptId].vocabularyData;
+                    useStoredData = true;
+                } else {
+                    console.log('No stored vocabulary data found for transcriptId:', transcriptId);
+                }
+                resolve();
+            });
+        });
+        
+        if (useStoredData) {
+            // Use data from storage
+            console.log('Using stored vocabulary data instead of API call');
+            vocabularyData = storedVocabularyData;
+        } else {
+            // Strip timestamps before sending to API
+            const cleanText = stripTimestamps(transcriptText);
+            
+            // Get vocabulary data from API
+            const apiVocabularyResponse = await apiService.getVocabularyAnalysis(cleanText);
+            vocabularyData = apiVocabularyResponse; // Use API response
+            
+            // Save vocabulary data to transcript_stats, merging with existing data
+            await new Promise(resolve => {
+                chrome.storage.local.get(['transcript_stats'], (result) => {
+                    const allStatsForSave = result.transcript_stats || {};
+                    const existingDataForId = allStatsForSave[transcriptId] || {};
+                    
+                    allStatsForSave[transcriptId] = {
+                        ...existingDataForId, // Preserve other data
+                        vocabularyData: apiVocabularyResponse // Add/update vocabularyData
+                    };
+                    
+                    chrome.storage.local.set({ transcript_stats: allStatsForSave }, () => {
+                        console.log('Saved vocabulary data to transcript_stats by merging:', allStatsForSave[transcriptId]);
+                        resolve();
+                    });
+                });
+            });
+        }
         
         // Process and display vocabulary data
         displayVocabularyData(vocabularyData);
@@ -608,10 +821,6 @@ async function loadVocabularyData() {
         isLoading = false;
     } catch (error) {
         console.error('Error loading vocabulary data:', error);
-        // Keep showing the loader instead of error message if data failed to load
-        // vocabularyCards.innerHTML = '<div class="error">Error loading vocabulary analysis. Please try again.</div>';
-        
-        // Don't hide the loader to indicate we're still waiting for data
         isLoading = false;
     }
 }
@@ -1063,95 +1272,135 @@ async function copyToClipboard(text) {
 async function loadGeneralStats() {
     try {
         const generalTabBody = document.querySelector('.general-tab-body');
-        const generalHeader = generalTabBody.querySelector('.general-header'); // Preserve header
-        const generalCardsContainer = generalTabBody.querySelector('.general-cards'); // Target for loader
+        const generalHeader = generalTabBody.querySelector('.general-header');
+        const generalCardsContainer = generalTabBody.querySelector('.general-cards');
 
         let originalCardsContent = '';
         if (generalCardsContainer) {
             originalCardsContent = generalCardsContainer.innerHTML;
-            generalCardsContainer.innerHTML = ''; // Clear only cards area
+            generalCardsContainer.innerHTML = '';
         } else {
             console.error(".general-cards container not found for loader.");
-            // Fallback: if no specific cards container, use the old method (might hide header)
-            // This part would ideally not be reached if HTML is structured correctly.
-            const originalContent = generalTabBody.innerHTML;
-            generalTabBody.innerHTML = generalHeader ? generalHeader.outerHTML : ''; // Keep header if possible
+            if (generalTabBody && generalHeader) generalTabBody.innerHTML = generalHeader.outerHTML;
+            else if (generalTabBody) generalTabBody.innerHTML = '';
         }
         
-        // Show loader within the general tab body (or specifically cards container if possible)
-        // showTabLoader expects a selector for the parent of the loader.
-        // If generalCardsContainer exists, we've cleared it. If not, showTabLoader will append to generalTabBody.
         showTabLoader(generalCardsContainer ? '.general-tab-body .general-cards' : '.general-tab-body');
         isLoading = true;
+
+        let useStoredData = false;
+        let storedApiStats = null;
         
-        // Strip timestamps before sending to API
-        const cleanText = stripTimestamps(transcriptText);
-        
-        // Get stats data from API
-        statsData = await apiService.getEnglishStats(cleanText);
-        
-        // Log the raw data received from the API
-        console.log('Raw english_stats API response:', statsData);
-        
-        // Restore the original content or structure
-        if (generalCardsContainer) {
-            generalCardsContainer.innerHTML = originalCardsContent; // Restore cards content
-        } else if (generalHeader) {
-            // If we fell back and cleared generalTabBody but kept header, re-insert original content after header
-            // This is a complex fallback; best if generalCardsContainer always exists.
-            // For simplicity, if generalCardsContainer is missing, the displayGeneralStats will repopulate from scratch anyway.
-        }
-        
-        // Process and display stats data (this will repopulate .general-cards)
-        displayGeneralStats(statsData);
-        
-        // Save scores to transcript_stats storage
-        let englishScore = statsData.general_score || statsData.english_score || 0;
-        englishScore = Math.round((frontendStats.fluency_score - englishScore)/4 + englishScore);
-        
-        let fluencyScore = frontendStats && frontendStats.fluency_score !== undefined ? 
-            frontendStats.fluency_score : (statsData.fluency_score || 47);
-            
-        let grammarScore = statsData.grammar_score || 80;
-        let vocabularyScore = statsData.vocabulary_score || 74;
-        
-        // Save these scores to transcript_stats
-        chrome.storage.local.get(['transcript_stats'], (result) => {
-            const allStats = result.transcript_stats || {};
-            if (!allStats[transcriptId]) {
-                allStats[transcriptId] = {};
-            }
-            
-            // Update scores in storage
-            allStats[transcriptId].englishScore = englishScore;
-            allStats[transcriptId].fluencyScore = fluencyScore;
-            allStats[transcriptId].grammarScore = grammarScore;
-            allStats[transcriptId].vocabularyScore = vocabularyScore;
-            
-            chrome.storage.local.set({ transcript_stats: allStats }, () => {
-                console.log('Saved scores to transcript_stats:', {
-                    englishScore,
-                    fluencyScore,
-                    grammarScore,
-                    vocabularyScore
-                });
+        await new Promise(resolve => {
+            chrome.storage.local.get(['transcript_stats'], (result) => {
+                const allStats = result.transcript_stats || {};
+                const currentIdStats = allStats[transcriptId];
+                if (currentIdStats && 
+                    currentIdStats.api_englishScore !== undefined &&
+                    currentIdStats.api_fluencyScore !== undefined &&
+                    currentIdStats.api_grammarScore !== undefined &&
+                    currentIdStats.api_vocabularyScore !== undefined &&
+                    currentIdStats.api_summary !== undefined && 
+                    currentIdStats.api_feedback !== undefined) {
+                    
+                    console.log('Found complete stored API stats for transcriptId:', transcriptId, currentIdStats);
+                    storedApiStats = currentIdStats;
+                    useStoredData = true;
+                } else {
+                    console.log('Incomplete or no stored API stats found for transcriptId:', transcriptId);
+                }
+                resolve();
             });
         });
         
-        // Hide loader (it was placed in generalCardsContainer or generalTabBody)
+        if (useStoredData) {
+            console.log('Using stored API stats instead of API call for general stats');
+            statsData = {
+                general_score: storedApiStats.api_englishScore,
+                english_score: storedApiStats.api_englishScore,
+                fluency_score: storedApiStats.api_fluencyScore,
+                grammar_score: storedApiStats.api_grammarScore,
+                vocabulary_score: storedApiStats.api_vocabularyScore,
+                summary: storedApiStats.api_summary,
+                feedback: storedApiStats.api_feedback
+            };
+        } else {
+            const cleanText = stripTimestamps(transcriptText);
+            const apiResponse = await apiService.getEnglishStats(cleanText);
+            console.log('Raw english_stats API response:', apiResponse);
+            statsData = apiResponse; // Keep raw API response initially
+            
+            let calculatedEnglishScore = apiResponse.general_score || apiResponse.english_score || 0;
+            if (frontendStats && frontendStats.fluency_score !== undefined) { // Ensure frontendStats is available
+                 calculatedEnglishScore = Math.round((frontendStats.fluency_score - calculatedEnglishScore)/4 + calculatedEnglishScore);
+            }
+            
+            let calculatedFluencyScore = (frontendStats && frontendStats.fluency_score !== undefined) ? 
+                frontendStats.fluency_score : (apiResponse.fluency_score || 0);
+                
+            let calculatedGrammarScore = apiResponse.grammar_score || 0;
+            let calculatedVocabularyScore = apiResponse.vocabulary_score || 0;
+            
+            await new Promise(resolve => {
+                chrome.storage.local.get(['transcript_stats'], (result) => {
+                    const allStatsForSave = result.transcript_stats || {};
+                    const existingDataForId = allStatsForSave[transcriptId] || {};
+                    
+                    allStatsForSave[transcriptId] = {
+                        ...existingDataForId, // Preserve other data (frontend, grammarData, vocabData)
+                        api_englishScore: calculatedEnglishScore,
+                        api_fluencyScore: calculatedFluencyScore,
+                        api_grammarScore: calculatedGrammarScore,
+                        api_vocabularyScore: calculatedVocabularyScore,
+                        api_summary: apiResponse.summary,      // Save summary from API
+                        api_feedback: apiResponse.feedback    // Save feedback from API
+                    };
+                    
+                    // Also save additional fluency stats if they were calculated by frontend
+                    if (frontendStats) {
+                        allStatsForSave[transcriptId].garbage_words = frontendStats.garbage_words;
+                        allStatsForSave[transcriptId].total_words = frontendStats.total_words;
+                        allStatsForSave[transcriptId].words_per_minute = frontendStats.words_per_minute;
+                        allStatsForSave[transcriptId].speaking_time_seconds = frontendStats.speaking_time_seconds;
+                    }
+                    
+                    chrome.storage.local.set({ transcript_stats: allStatsForSave }, () => {
+                        console.log('Saved API scores (and summary/feedback) to transcript_stats by merging:', allStatsForSave[transcriptId]);
+                        resolve();
+                    });
+                });
+            });
+            // Update statsData for displayGeneralStats to use the calculated scores
+            statsData = {
+                general_score: calculatedEnglishScore,
+                english_score: calculatedEnglishScore, 
+                fluency_score: calculatedFluencyScore,
+                grammar_score: calculatedGrammarScore,
+                vocabulary_score: calculatedVocabularyScore,
+                summary: apiResponse.summary,
+                feedback: apiResponse.feedback
+            };
+        }
+        
+        if (generalCardsContainer) {
+            generalCardsContainer.innerHTML = originalCardsContent;
+        } else if (generalTabBody && generalHeader) {
+            // Minimal repopulation if structure was altered
+        }
+        
+        displayGeneralStats(statsData);
+        
         hideTabLoader(generalCardsContainer ? '.general-tab-body .general-cards' : '.general-tab-body');
         isLoading = false;
     } catch (error) {
         console.error('Error loading general stats:', error);
-        
+        // ... (error handling as before) ...
         const generalTabBody = document.querySelector('.general-tab-body');
         const generalCardsContainer = generalTabBody ? generalTabBody.querySelector('.general-cards') : null;
 
         if (generalCardsContainer) {
             generalCardsContainer.innerHTML = '<div class="error-message" style="text-align:center; padding:20px; color:red;">Error analyzing your speech. Please try again.</div>';
         } else if (generalTabBody) {
-            // If general-cards is not found, but general-tab-body exists, display error there (header might be missing)
-            // Ensure header is present or reconstructed if displaying error in the main body
             if (!generalTabBody.querySelector('.general-header')) {
                  generalTabBody.innerHTML = `
                     <div class="general-header">
@@ -1166,13 +1415,11 @@ async function loadGeneralStats() {
                     <div class="general-cards">
                          <div class="error-message" style="text-align:center; padding:20px; color:red;">Please try refreshing.</div>
                     </div>
-                `; // Reconstruct basic structure with error
+                `;
             } else {
-                 // Header exists, just put error in a reconstructed cards div
                  generalTabBody.innerHTML += '<div class="general-cards"><div class="error-message" style="text-align:center; padding:20px; color:red;">Error analyzing your speech. Please try again.</div></div>';
             }
         }
-        
         hideTabLoader(generalCardsContainer ? '.general-tab-body .general-cards' : '.general-tab-body');
         isLoading = false;
     }
@@ -1190,8 +1437,6 @@ function displayGeneralStats(data) {
     try {
         // Update English score - use general_score from backend
         let englishScore = data.general_score || data.english_score || 0;
-        englishScore = (frontendStats.fluency_score - englishScore)/4 + englishScore;
-        englishScore = Math.round(englishScore);
         console.log('Using score from backend:', englishScore);
         
         const scoreElement = document.querySelector('.frame-569 .h-3-header');
@@ -1207,14 +1452,14 @@ function displayGeneralStats(data) {
         }
         
         // Update vocabulary score
-        const vocabularyScore = data.vocabulary_score || 74; // Fallback to default
+        const vocabularyScore = data.vocabulary_score || 0; // Fallback to default
         const vocabularyElement = document.querySelector('.title3 .title-3-span3');
         if (vocabularyElement) {
             vocabularyElement.textContent = `${vocabularyScore}%`;
         }
         
         // Update grammar score
-        const grammarScore = data.grammar_score || 80; // Fallback to default
+        const grammarScore = data.grammar_score || 0; // Fallback to default
         const grammarElement = document.querySelector('.title2 .title-2-span3');
         if (grammarElement) {
             grammarElement.textContent = `${grammarScore}%`;
@@ -1226,7 +1471,7 @@ function displayGeneralStats(data) {
             fluencyScore = frontendStats.fluency_score;
             console.log('Using fluency score from frontend calculations:', fluencyScore);
         } else {
-            fluencyScore = data.fluency_score || 47; // Fallback to API or default
+            fluencyScore = data.fluency_score || 0; // Fallback to API or default
             console.log('Using fluency score from API or default:', fluencyScore);
         }
         
@@ -1246,6 +1491,12 @@ function displayGeneralStats(data) {
             const paragraphElement = document.querySelector('.frame-565 .paragraph');
             if (paragraphElement) {
                 paragraphElement.textContent = data.summary;
+            }
+        } else if (data.feedback) {
+            // If no summary but we have feedback, use the feedback for the summary paragraph too
+            const paragraphElement = document.querySelector('.frame-565 .paragraph');
+            if (paragraphElement) {
+                paragraphElement.textContent = data.feedback;
             }
         }
 
@@ -1425,6 +1676,42 @@ function updateScoreTriangle(fluencyScore, grammarScore, vocabularyScore) {
 
 // Function to load and display stats calculated by transcript_stats.js
 async function loadAndDisplayFrontendStats() {
+    // First check if we already have fluency data in storage
+    let storedFluencyData = null;
+    let useStoredFluencyData = false;
+    
+    await new Promise(resolve => {
+        chrome.storage.local.get(['transcript_stats'], (result) => {
+            const allStats = result.transcript_stats || {};
+            if (allStats[transcriptId] && 
+                allStats[transcriptId].api_fluencyScore !== undefined && 
+                allStats[transcriptId].garbage_words) {
+                console.log('[loadAndDisplayFrontendStats] Found stored fluency data:', allStats[transcriptId]);
+                storedFluencyData = allStats[transcriptId];
+                useStoredFluencyData = true;
+            } else {
+                console.log('[loadAndDisplayFrontendStats] No complete fluency data found in storage');
+            }
+            resolve();
+        });
+    });
+    
+    if (useStoredFluencyData) {
+        console.log('[loadAndDisplayFrontendStats] Using stored fluency data instead of recalculating');
+        // Create a frontendStats object using the stored data
+        frontendStats = {
+            fluency_score: storedFluencyData.api_fluencyScore,
+            garbage_words: storedFluencyData.garbage_words,
+            total_words: storedFluencyData.total_words || 0,
+            words_per_minute: storedFluencyData.words_per_minute || 0,
+            speaking_time_seconds: storedFluencyData.speaking_time_seconds || 0
+        };
+        
+        // Display the fluency data
+        displayFluencyData(frontendStats);
+        return;
+    }
+    
     if (typeof calculateTranscriptStats === 'function') {
         console.log("Calculating frontend stats...");
         try {

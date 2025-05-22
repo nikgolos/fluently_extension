@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (transcripts.length === 0) {
         transcriptList.innerHTML = `
           <div class="empty-state">
-            No transcripts saved yet. Start recording a Google Meet to create transcripts.
+            Start a Google Meet call in English and speak at least 50 words to receive your first feedback.
           </div>
         `;
         return;
@@ -131,15 +131,15 @@ document.addEventListener('DOMContentLoaded', () => {
           const allStats = result.transcript_stats || {};
           const stats = allStats[transcript.id];
           
-          if (stats && stats.englishScore) {
+          if (stats && stats.api_englishScore) {
             const englishLevel = document.getElementById(`englishLevel-${transcript.id}`);
             if (englishLevel) {
-              englishLevel.textContent = `${stats.englishScore}/100`;
+              englishLevel.textContent = `${stats.api_englishScore}/100`;
               
               // Add level class based on score
-              if (stats.englishScore >= 80) {
+              if (stats.api_englishScore >= 80) {
                 englishLevel.classList.add('level-high');
-              } else if (stats.englishScore >= 60) {
+              } else if (stats.api_englishScore >= 60) {
                 englishLevel.classList.add('level-medium');
               } else {
                 englishLevel.classList.add('level-low');
@@ -226,7 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("Retrieved stored stats for transcript:", transcriptId, stats);
         
         // Update UI with the stats
-        document.getElementById('englishScoreValue').textContent = stats.englishScore ? `${stats.englishScore}/100` : '-';
+        document.getElementById('englishScoreValue').textContent = stats.api_englishScore ? `${stats.api_englishScore}/100` : '-';
         
         // Apply color to Fluency Score based on value
         const fluencyElement = document.getElementById('fluencyScoreValue');
@@ -246,9 +246,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Apply color to Grammar Score based on value
         const grammarElement = document.getElementById('grammarScoreValue');
-        if (stats.grammarScore) {
-          grammarElement.textContent = `${stats.grammarScore}%`;
-          if (stats.grammarScore >= 70) {
+        if (stats.api_grammarScore) {
+          grammarElement.textContent = `${stats.api_grammarScore}%`;
+          if (stats.api_grammarScore >= 70) {
             grammarElement.classList.add('score-good');
             grammarElement.classList.remove('score-bad');
           } else {
@@ -262,9 +262,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Apply color to Vocabulary Score based on value
         const vocabElement = document.getElementById('vocabularyScoreValue');
-        if (stats.vocabularyScore) {
-          vocabElement.textContent = `${stats.vocabularyScore}%`;
-          if (stats.vocabularyScore >= 70) {
+        if (stats.api_vocabularyScore) {
+          vocabElement.textContent = `${stats.api_vocabularyScore}%`;
+          if (stats.api_vocabularyScore >= 70) {
             vocabElement.classList.add('score-good');
             vocabElement.classList.remove('score-bad');
           } else {
