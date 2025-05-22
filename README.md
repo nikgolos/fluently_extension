@@ -1,54 +1,42 @@
-# Google Meet Transcriber Chrome Extension
+# Fluently - Real-time English Enhancement for Google Meet
 
-A Chrome extension that automatically transcribes Google Meet meetings using Web Speech API.
+Fluently is a Chrome extension that helps non-native English speakers improve their language skills during Google Meet calls. It provides real-time analysis and post-meeting insights into your English proficiency across three key dimensions: grammar, vocabulary, and fluency.
 
 ## Features
-- Automatically detects when you join a Google Meet meeting
-- Automatically starts transcribing when a meeting is detected
-- Records and transcribes speech in real-time
-- Enhanced echo cancellation for improved transcription of other speakers on calls
-- Auto-saves transcriptions at regular intervals
-- View and manage saved transcriptions
-- Simple and intuitive interface
+
+- **Real-time Language Analysis**: Monitors your speech during Google Meet calls
+- **Comprehensive Scoring**: Evaluates your English proficiency on a 100-point scale
+- **Detailed Feedback Categories**:
+  - 📚 Vocabulary Enhancement
+  - ✍️ Grammar Correction
+  - 👄 Fluency Assessment
+
+## Key Metrics
+
+- Speech pace monitoring (words per minute)
+- Filler word detection and counting
+- Grammar error identification
+- Vocabulary improvement suggestions
+
+## Post-Meeting Analysis
+
+After each call, receive a detailed report including:
+- Overall English proficiency score
+- Specific areas for improvement
+- Comparison with native speaker benchmarks
+- Detailed breakdown of grammar and vocabulary errors
 
 ## Installation
 
-1. Clone this repository
-2. Open Chrome and go to `chrome://extensions/`
-3. Enable "Developer mode" in the top right
-4. Click "Load unpacked" and select the extension directory
+1. Download the extension from the Chrome Web Store (link coming soon)
+2. Add it to Chrome
+3. Grant necessary permissions for Google Meet integration
+4. Start your Google Meet calls as usual
 
-## Usage
+## Privacy
 
-1. Join any Google Meet meeting
-2. The extension will automatically detect the meeting and start transcribing
-3. You can also manually control recording from the extension popup
-4. View saved transcripts by clicking "View Saved Transcripts" in the popup
+Your call data is processed securely and used solely for providing language improvement feedback.
 
-## Requirements
+## Support
 
-- Chrome browser
-- Microphone access permission
-- Google Meet access
-
-## How It Works
-
-This extension:
-- Detects when you're in an active Google Meet meeting
-- Uses the Web Speech API to transcribe speech in real-time
-- Applies enhanced audio processing with echo cancellation to better capture all speakers
-- Automatically saves transcripts at regular intervals
-- Detects when meetings end and finalizes transcripts
-- Provides an interface to view and manage your saved transcripts
-
-## Project Structure
-
-- `manifest.json` - Extension configuration
-- `popup.html/js` - Extension popup interface
-- `content.js` - Handles meeting detection and transcription
-- `background.js` - Manages background processes and storage
-- `transcripts.html/js` - Transcript viewing interface
-
-## Privacy Note
-
-All transcription happens locally in your browser using the Web Speech API. Your meeting audio and transcripts are stored locally and are not sent to any external servers. 
+For issues, feature requests, or questions, please open an issue in this repository.
