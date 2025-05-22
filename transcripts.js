@@ -3,7 +3,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const transcriptView = document.getElementById('transcriptView');
   const transcriptTitle = document.getElementById('transcriptTitle');
   const transcriptTime = document.getElementById('transcriptTime');
-  const transcriptContent = document.getElementById('transcriptContent');
   const clearAllBtn = document.getElementById('clearAllBtn');
   const downloadCurrentBtn = document.getElementById('downloadCurrentBtn');
   
@@ -121,9 +120,34 @@ document.addEventListener('DOMContentLoaded', () => {
         transcriptItem.className = 'transcript-item';
         transcriptItem.dataset.id = transcript.id;
         transcriptItem.innerHTML = `
-          <div class="transcript-date">${transcript.formattedDate} ${recoveredBadge}</div>
-          <div class="transcript-preview">${meetingInfo}</div>
+          <div class="transcript-info">
+            <div class="transcript-date">${transcript.formattedDate} ${recoveredBadge}</div>
+            <div class="transcript-preview">${meetingInfo}</div>
+          </div>
+          <div class="english-level" id="englishLevel-${transcript.id}">-</div>
         `;
+        
+        // Load the English score from transcript_stats
+        chrome.storage.local.get(['transcript_stats'], (result) => {
+          const allStats = result.transcript_stats || {};
+          const stats = allStats[transcript.id];
+          
+          if (stats && stats.englishScore) {
+            const englishLevel = document.getElementById(`englishLevel-${transcript.id}`);
+            if (englishLevel) {
+              englishLevel.textContent = `${stats.englishScore}/100`;
+              
+              // Add level class based on score
+              if (stats.englishScore >= 80) {
+                englishLevel.classList.add('level-high');
+              } else if (stats.englishScore >= 60) {
+                englishLevel.classList.add('level-medium');
+              } else {
+                englishLevel.classList.add('level-low');
+              }
+            }
+          }
+        });
         
         transcriptItem.addEventListener('click', () => {
           // Store the current transcript
@@ -194,10 +218,56 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("Retrieved stored stats for transcript:", transcriptId, stats);
         
         // Update UI with the stats
-        document.getElementById('englishScoreValue').textContent = stats.englishScore ? `${stats.englishScore} out 100` : '-';
-        document.getElementById('fluencyScoreValue').textContent = stats.fluencyScore ? `${stats.fluencyScore}%` : '-';
-        document.getElementById('grammarScoreValue').textContent = stats.grammarScore ? `${stats.grammarScore}%` : '-';
-        document.getElementById('vocabularyScoreValue').textContent = stats.vocabularyScore ? `${stats.vocabularyScore}%` : '-';
+        document.getElementById('englishScoreValue').textContent = stats.englishScore ? `${stats.englishScore}/100` : '-';
+        
+        // Apply color to Fluency Score based on value
+        const fluencyElement = document.getElementById('fluencyScoreValue');
+        if (stats.fluencyScore) {
+          fluencyElement.textContent = `${stats.fluencyScore}%`;
+          if (stats.fluencyScore >= 70) {
+            fluencyElement.classList.add('score-good');
+            fluencyElement.classList.remove('score-bad');
+          } else {
+            fluencyElement.classList.add('score-bad');
+            fluencyElement.classList.remove('score-good');
+          }
+        } else {
+          fluencyElement.textContent = '-';
+          fluencyElement.classList.remove('score-good', 'score-bad');
+        }
+        
+        // Apply color to Grammar Score based on value
+        const grammarElement = document.getElementById('grammarScoreValue');
+        if (stats.grammarScore) {
+          grammarElement.textContent = `${stats.grammarScore}%`;
+          if (stats.grammarScore >= 70) {
+            grammarElement.classList.add('score-good');
+            grammarElement.classList.remove('score-bad');
+          } else {
+            grammarElement.classList.add('score-bad');
+            grammarElement.classList.remove('score-good');
+          }
+        } else {
+          grammarElement.textContent = '-';
+          grammarElement.classList.remove('score-good', 'score-bad');
+        }
+        
+        // Apply color to Vocabulary Score based on value
+        const vocabElement = document.getElementById('vocabularyScoreValue');
+        if (stats.vocabularyScore) {
+          vocabElement.textContent = `${stats.vocabularyScore}%`;
+          if (stats.vocabularyScore >= 70) {
+            vocabElement.classList.add('score-good');
+            vocabElement.classList.remove('score-bad');
+          } else {
+            vocabElement.classList.add('score-bad');
+            vocabElement.classList.remove('score-good');
+          }
+        } else {
+          vocabElement.textContent = '-';
+          vocabElement.classList.remove('score-good', 'score-bad');
+        }
+        
         document.getElementById('speakingTimeValue').textContent = stats.speaking_time || '-';
       } else {
         console.log("No stored stats found, calculating on the fly for:", currentTranscript?.id);
@@ -210,7 +280,23 @@ document.addEventListener('DOMContentLoaded', () => {
           
           // The API-based scores might not be available without API call
           document.getElementById('englishScoreValue').textContent = '-';
-          document.getElementById('fluencyScoreValue').textContent = calculatedStats.fluency_score ? `${calculatedStats.fluency_score}%` : '-';
+          
+          // Apply color to Fluency Score if available
+          const fluencyElement = document.getElementById('fluencyScoreValue');
+          if (calculatedStats.fluency_score) {
+            fluencyElement.textContent = `${calculatedStats.fluency_score}%`;
+            if (calculatedStats.fluency_score >= 70) {
+              fluencyElement.classList.add('score-good');
+              fluencyElement.classList.remove('score-bad');
+            } else {
+              fluencyElement.classList.add('score-bad');
+              fluencyElement.classList.remove('score-good');
+            }
+          } else {
+            fluencyElement.textContent = '-';
+            fluencyElement.classList.remove('score-good', 'score-bad');
+          }
+          
           document.getElementById('grammarScoreValue').textContent = '-';
           document.getElementById('vocabularyScoreValue').textContent = '-';
         }

@@ -2,145 +2,326 @@
 <html>
 <head>
   <title>Calls History</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  
   <style>
+    :root {
+      --primary: #58CC02;
+      --primary-dark: #46A302;
+      --primary-light: #D7FFB8;
+      --secondary: #1CB0F6;
+      --secondary-light: #E5F8FF;
+      --white: #ffffff;
+      --text: #3C3C3C;
+      --text-light: #5f6368;
+      --blue: #4285f4;
+      --blue-dark: #1a73e8;
+      --blue-light: #e8f0fe;
+      --green: #0f9d58;
+      --red: #ea4335;
+      --warning: #fbbc04;
+      --background-blue: #d8e6ff;
+      --shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Google Sans', 'Roboto', sans-serif;
       max-width: 1000px;
       margin: 0 auto;
       padding: 20px;
-      background-color: #f5f5f5;
+      background-color: #f7f7f7;
+      color: var(--text);
     }
+    
     h1 {
-      color: #4285f4;
-      margin-bottom: 20px;
+      color: var(--blue-dark);
+      margin-bottom: 12px;
+      font-size: 32px;
+      font-weight: 500;
+      padding: 10px 8px;
     }
+    
+    h2 {
+      color: var(--text);
+      font-size: 24px;
+      font-weight: 500;
+      margin-bottom: 12px;
+    }
+    
     .transcript-list {
-      margin-bottom: 20px;
-    }
-    .transcript-item {
-      padding: 10px;
-      background-color: white;
-      border-left: 4px solid #4285f4;
-      margin-bottom: 10px;
-      cursor: pointer;
-      border-radius: 4px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      transition: all 0.2s;
-    }
-    .transcript-item:hover {
-      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-      transform: translateY(-2px);
-    }
-    .transcript-date {
-      font-weight: bold;
-      color: #4285f4;
-    }
-    .transcript-preview {
-      color: #666;
-      margin-top: 4px;
-      white-space: nowrap;
+      margin-bottom: 24px;
+      border-radius: 16px;
       overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 100%;
+      background: var(--white);
+      box-shadow: var(--shadow);
     }
-    .transcript-view {
+    
+    .transcript-item {
+      padding: 16px;
       background-color: white;
-      padding: 20px;
-      border-radius: 4px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      margin-top: 20px;
-    }
-    .transcript-content {
-      white-space: pre-wrap;
-      line-height: 1.5;
-    }
-    .toolbar {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 20px;
-    }
-    button {
-      padding: 8px 16px;
+      border-left: 4px solid var(--blue);
       cursor: pointer;
-      background-color: #4285f4;
-      color: white;
-      border: none;
-      border-radius: 4px;
-    }
-    button:hover {
-      background-color: #3367d6;
-    }
-    .empty-state {
-      text-align: center;
-      padding: 40px;
-      color: #666;
-    }
-    .transcript-time {
-      font-size: 0.8em;
-      color: #888;
-      margin-top: 2px;
-    }
-    .meeting-id {
-      font-size: 0.9em;
-      background-color: #e8f0fe;
-      color: #4285f4;
-      padding: 2px 8px;
-      border-radius: 10px;
-      margin-left: 10px;
-    }
-    .recovered-badge {
-      background-color: #fbbc04;
-      color: white;
-      font-size: 0.7em;
-      padding: 2px 6px;
-      border-radius: 10px;
-      margin-left: 6px;
-      vertical-align: middle;
-    }
-    .recovery-note {
-      background-color: #fff3cd;
-      border: 1px solid #ffecb5;
-      color: #856404;
-      padding: 15px;
-      margin-bottom: 20px;
-      border-radius: 4px;
+      transition: all 0.2s;
+      border-bottom: 1px solid rgba(0,0,0,0.04);
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
-    .recovery-note button {
-      background-color: #f9a825;
+    
+    .transcript-item:last-child {
+      border-bottom: none;
     }
+    
+    .transcript-item:hover {
+      background-color: var(--blue-light);
+      transform: translateY(-2px);
+    }
+    
+    .transcript-item.active {
+      border-left-color: var(--green);
+    }
+    
+    .transcript-info {
+      flex: 1;
+      overflow: hidden;
+    }
+    
+    .transcript-date {
+      font-weight: 500;
+      color: var(--blue-dark);
+      font-size: 16px;
+    }
+    
+    .transcript-preview {
+      color: var(--text-light);
+      margin-top: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+      font-size: 14px;
+    }
+    
+    .english-level {
+      font-size: 18px;
+      font-weight: 700;
+      min-width: 70px;
+      height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 20px;
+      margin-left: 12px;
+      padding: 0 12px;
+      background-color: var(--blue-light);
+      color: var(--blue-dark);
+    }
+    
+    .english-level.level-high {
+      background-color: rgba(26, 115, 232, 0.15);
+      color: var(--blue-dark);
+      border: 1px solid rgba(66, 133, 244, 0.3);
+    }
+    
+    .english-level.level-medium {
+      background-color: var(--blue-light);
+      color: var(--blue);
+    }
+    
+    .english-level.level-low {
+      background-color: var(--background-blue);
+      color: var(--blue);
+    }
+    
+    .transcript-view {
+      background-color: white;
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      margin-top: 24px;
+    }
+    
+    .transcript-content {
+      white-space: pre-wrap;
+      line-height: 1.6;
+      margin-top: 16px;
+      padding: 16px;
+      background-color: #fafafa;
+      border-radius: 8px;
+      font-family: 'Roboto', sans-serif;
+      font-size: 15px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+      padding: 0 8px;
+    }
+    
+    button {
+      padding: 12px 16px;
+      cursor: pointer;
+      background-color: var(--blue);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-family: 'Google Sans', sans-serif;
+      font-weight: 500;
+      font-size: 14px;
+      transition: all 0.2s;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    button:hover {
+      background-color: var(--blue-dark);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+      transform: translateY(-1px);
+    }
+    
+    button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 60px 0;
+      color: var(--text-light);
+      font-size: 16px;
+    }
+    
+    .transcript-time {
+      font-size: 14px;
+      color: var(--text-light);
+      margin-top: 4px;
+      margin-bottom: 16px;
+    }
+    
+    .meeting-id {
+      display: inline-block;
+      font-size: 13px;
+      background-color: var(--blue-light);
+      color: var(--blue-dark);
+      padding: 4px 10px;
+      border-radius: 12px;
+      margin-left: 10px;
+      font-weight: 500;
+    }
+    
+    .recovered-badge {
+      display: inline-block;
+      background-color: var(--warning);
+      color: white;
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      margin-left: 8px;
+      font-weight: 500;
+    }
+    
+    .recovery-note {
+      background-color: rgba(251, 188, 4, 0.1);
+      border: 1px solid rgba(251, 188, 4, 0.3);
+      color: #856404;
+      padding: 16px;
+      margin-bottom: 24px;
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .recovery-note button {
+      background-color: var(--warning);
+    }
+    
     .recovery-note button:hover {
       background-color: #f57f17;
     }
     
-    /* Transcript stats styles */
+    /* Transcript stats styles - updated to match post-meeting design */
     .transcript-stats {
       display: flex;
       flex-wrap: wrap;
       gap: 12px;
       margin: 15px 0;
+      width: 100%;
     }
+    
     .stat-card {
-      background-color: #e8f0fe;
-      border-radius: 8px;
-      padding: 10px 14px;
+      background-color: var(--white);
+      border-radius: 16px;
+      padding: 14px 18px;
       min-width: 120px;
       flex: 1;
       box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      border: 2px solid var(--blue-light);
+      transition: transform 0.2s, box-shadow 0.2s;
     }
+    
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+      border-color: var(--background-blue);
+    }
+    
     .stat-title {
-      color: #4285f4;
-      font-size: 0.85em;
-      font-weight: bold;
-      margin-bottom: 5px;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 500;
+      margin-bottom: 8px;
     }
+    
     .stat-value {
-      font-size: 1.3em;
-      font-weight: bold;
-      color: #1a73e8;
+      font-size: 20px;
+      font-weight: 700;
       white-space: nowrap;
+    }
+    
+    /* Score-specific styles */
+    #englishScoreValue, #speakingTimeValue {
+      color: var(--blue-dark);
+    }
+    
+    .score-good {
+      color: var(--green) !important;
+    }
+    
+    .score-bad {
+      color: var(--red) !important;
+    }
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+      background: #a0a0a0;
     }
   </style>
 </head>
@@ -160,7 +341,6 @@
   <div class="transcript-view" id="transcriptView" style="display: none;">
     <h2 id="transcriptTitle">Transcript</h2>
     <div class="transcript-time" id="transcriptTime"></div>
-    <div class="transcript-content" id="transcriptContent"></div>
   </div>
 
   <script src="transcripts.js"></script>
