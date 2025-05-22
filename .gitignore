@@ -2,3 +2,6 @@ test.py
 /tests
 .venv
 post-meeting/test-data
+.DS_Store
+.DS_Store
+post-meeting/.DS_Store
