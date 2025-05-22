@@ -1186,8 +1186,16 @@ function setupButtonHandlers() {
     // Share button handler
     if (shareButton) {
         shareButton.addEventListener('click', () => {
-            // Navigate to transcripts page
-            window.location.href = '../transcripts.html';
+            // Check if session is marked as English before navigating
+            chrome.storage.local.get(['transcript_stats'], (result) => {
+                const allStats = result.transcript_stats || {};
+                const currentStats = allStats[transcriptId];
+                
+                // Only navigate if we have stats and English scores
+                if (currentStats && currentStats.api_englishScore !== undefined) {
+                    window.location.href = '../transcripts.html';
+                }
+            });
         });
     }
     
