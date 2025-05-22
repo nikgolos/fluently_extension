@@ -604,7 +604,7 @@ function filterGrammarMistakes(mistakes) {
     }
     
     // Terms to filter out
-    const filterTerms = ['capitaliz', 'hyphen', 'comma', 'conjunction', 'No grammar error', 'no grammar error'];
+    const filterTerms = ['capitaliz', 'hyphen', 'comma', 'conjunction', 'No grammar error', 'no grammar error', 'punctuation', 'question mark', 'repeating'];
     
     // Filter out mistakes with explanations containing any of the filter terms
     return mistakes.filter(mistake => {
