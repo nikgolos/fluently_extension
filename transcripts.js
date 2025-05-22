@@ -123,7 +123,12 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="transcript-date">${transcript.formattedDate} ${recoveredBadge}</div>
             <div class="transcript-preview">${meetingInfo}</div>
           </div>
-          <div class="english-level" id="englishLevel-${transcript.id}">-</div>
+          <div class="transcript-actions">
+            <div class="english-level" id="englishLevel-${transcript.id}">-</div>
+            <div class="delete-transcript" title="Delete this call">
+              <img src="icons/trash.svg" alt="Delete" />
+            </div>
+          </div>
         `;
         
         // Load the English score from transcript_stats
@@ -146,6 +151,50 @@ document.addEventListener('DOMContentLoaded', () => {
               }
             }
           }
+        });
+        
+        // Add delete handler
+        const deleteBtn = transcriptItem.querySelector('.delete-transcript');
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent triggering the transcript item click
+            
+            // Show confirmation popup
+            if (confirm('Are you sure you want to delete this call? This cannot be undone.')) {
+                // Delete from storage
+                chrome.storage.local.get(['transcripts', 'transcript_stats'], (result) => {
+                    // Remove from transcripts
+                    const transcripts = result.transcripts || [];
+                    const updatedTranscripts = transcripts.filter(t => t.id !== transcript.id);
+                    
+                    // Remove from transcript_stats
+                    const allStats = result.transcript_stats || {};
+                    delete allStats[transcript.id];
+                    
+                    // Save both updates
+                    chrome.storage.local.set({
+                        transcripts: updatedTranscripts,
+                        transcript_stats: allStats
+                    }, () => {
+                        // Remove the item from UI
+                        transcriptItem.remove();
+                        
+                        // If this was the selected transcript, clear the view
+                        if (currentTranscript && currentTranscript.id === transcript.id) {
+                            transcriptView.style.display = 'none';
+                            currentTranscript = null;
+                        }
+                        
+                        // If no transcripts left, show empty state
+                        if (updatedTranscripts.length === 0) {
+                            transcriptList.innerHTML = `
+                                <div class="empty-state">
+                                    Start a Google Meet call in English and speak at least 50 words to receive your first feedback.
+                                </div>
+                            `;
+                        }
+                    });
+                });
+            }
         });
         
         transcriptItem.addEventListener('click', () => {
