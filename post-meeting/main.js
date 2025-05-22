@@ -109,7 +109,7 @@ async function initApp() {
         // 2. Calculate and display frontend-based stats (including Fluency)
         // This might modify storage and sets global `frontendStats`
         console.log("[initApp] Starting frontend stats calculation...");
-        await loadAndDisplayFrontendStats(); 
+        await loadAndDisplayFrontendStats();
         console.log("[initApp] Frontend stats calculation complete. Global frontendStats:", frontendStats);
 
         // 3. Determine if all necessary API-derived data was present in `initialStoredDataForTranscript`
@@ -515,7 +515,7 @@ async function loadGrammarData() {
             console.log('Using stored grammar data instead of API call');
             grammarData = storedGrammarData;
         } else {
-            const cleanText = stripTimestamps(transcriptText);
+        const cleanText = stripTimestamps(transcriptText);
             const apiGrammarResponse = await apiService.getGrammarAnalysis(cleanText);
             grammarData = apiGrammarResponse; // Use API response
             
@@ -604,7 +604,7 @@ function filterGrammarMistakes(mistakes) {
     }
     
     // Terms to filter out
-    const filterTerms = ['capitaliz', 'hyphen', 'comma'];
+    const filterTerms = ['capitaliz', 'hyphen', 'comma', 'conjunction', 'No grammar error', 'no grammar error'];
     
     // Filter out mistakes with explanations containing any of the filter terms
     return mistakes.filter(mistake => {
@@ -780,10 +780,10 @@ async function loadVocabularyData() {
             console.log('Using stored vocabulary data instead of API call');
             vocabularyData = storedVocabularyData;
         } else {
-            // Strip timestamps before sending to API
-            const cleanText = stripTimestamps(transcriptText);
-            
-            // Get vocabulary data from API
+        // Strip timestamps before sending to API
+        const cleanText = stripTimestamps(transcriptText);
+        
+        // Get vocabulary data from API
             const apiVocabularyResponse = await apiService.getVocabularyAnalysis(cleanText);
             vocabularyData = apiVocabularyResponse; // Use API response
             
@@ -889,7 +889,7 @@ function createSynonymsSection(synonyms) {
     // Create header text
     const header = document.createElement('div');
     header.className = 'h-3-header';
-    header.textContent = 'Vocabulary Elevation';
+    header.textContent = 'Synonyms';
     
     // Create description
     const text = document.createElement('div');
@@ -1186,13 +1186,8 @@ function setupButtonHandlers() {
     // Share button handler
     if (shareButton) {
         shareButton.addEventListener('click', () => {
-            // Create a text summary to share
-            const summaryText = createShareableSummary();
-            
-            // Copy to clipboard
-            copyToClipboard(summaryText)
-                .then(() => alert('Stats copied to clipboard!'))
-                .catch(err => console.error('Failed to copy:', err));
+            // Navigate to transcripts page
+            window.location.href = '../transcripts.html';
         });
     }
     
@@ -1287,7 +1282,7 @@ async function loadGeneralStats() {
         
         showTabLoader(generalCardsContainer ? '.general-tab-body .general-cards' : '.general-tab-body');
         isLoading = true;
-
+        
         let useStoredData = false;
         let storedApiStats = null;
         
@@ -1342,7 +1337,7 @@ async function loadGeneralStats() {
             let calculatedVocabularyScore = apiResponse.vocabulary_score || 0;
             
             await new Promise(resolve => {
-                chrome.storage.local.get(['transcript_stats'], (result) => {
+        chrome.storage.local.get(['transcript_stats'], (result) => {
                     const allStatsForSave = result.transcript_stats || {};
                     const existingDataForId = allStatsForSave[transcriptId] || {};
                     
@@ -1367,9 +1362,9 @@ async function loadGeneralStats() {
                     chrome.storage.local.set({ transcript_stats: allStatsForSave }, () => {
                         console.log('Saved API scores (and summary/feedback) to transcript_stats by merging:', allStatsForSave[transcriptId]);
                         resolve();
-                    });
                 });
             });
+        });
             // Update statsData for displayGeneralStats to use the calculated scores
             statsData = {
                 general_score: calculatedEnglishScore,

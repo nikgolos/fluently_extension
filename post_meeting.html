@@ -198,7 +198,7 @@
        position: static; 
    }
    </style>
-  <title>Meeting Stats - Duo</title>
+  <title>Meeting Stats</title>
   
   <!-- Load tab script first -->
   <script src="post-meeting/tabs.js"></script>
@@ -217,16 +217,16 @@
         <div class="general-tab tab-selected">
           <div class="label">General</div>
         </div>
-        <div class="grammar-tab">
-          <div class="label">Grammar</div>
-          <div class="badge-green">
-            <div class="badge-label">0</div>
-          </div>
-        </div>
         <div class="vocabulary-tab">
           <div class="label">Vocabulary</div>
           <div class="badge-red">
             <div class="badge-label">1</div>
+          </div>
+        </div>
+        <div class="grammar-tab">
+          <div class="label">Grammar</div>
+          <div class="badge-green">
+            <div class="badge-label">0</div>
           </div>
         </div>
         <div class="fluency-tab">
@@ -327,6 +327,19 @@
         </div>
       </div>
     </div>
+    <div class="vocabulary-tab-body">
+      <div class="vocabulary-header">
+        <div class="header2">
+          <div class="icon">📚</div>
+          <div class="h-2-header">Vocabulary</div>
+        </div>
+        <div class="paragraph">
+          Elevate your language with more precise and professional vocabulary
+        </div>
+      </div>
+      <div class="vocabulary-cards">
+      </div>
+    </div>
     <div class="grammar-tab-body">
       <div class="grammar-header">
         <div class="grammar-header2">
@@ -339,19 +352,6 @@
       </div>
       <div class="grammar-cards">
         <!-- Grammar cards will be dynamically inserted here by JavaScript -->
-      </div>
-    </div>
-    <div class="vocabulary-tab-body">
-      <div class="vocabulary-header">
-        <div class="header2">
-          <div class="icon">📚</div>
-          <div class="h-2-header">Vocabulary</div>
-        </div>
-        <div class="paragraph">
-          Elevate your language with more precise and professional vocabulary
-        </div>
-      </div>
-      <div class="vocabulary-cards">
       </div>
     </div>
     <div class="fluency-tab-body">
@@ -418,7 +418,7 @@
     <div class="buttons">
       <div class="share-button">
         <div class="state-layer">
-          <div class="label-text">Share the stats</div>
+          <div class="label-text">Open calls history</div>
         </div>
       </div>
       <div class="return-button">

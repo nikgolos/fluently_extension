@@ -230,9 +230,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Apply color to Fluency Score based on value
         const fluencyElement = document.getElementById('fluencyScoreValue');
-        if (stats.fluencyScore) {
-          fluencyElement.textContent = `${stats.fluencyScore}%`;
-          if (stats.fluencyScore >= 70) {
+        if (stats.api_fluencyScore) {
+          fluencyElement.textContent = `${stats.api_fluencyScore}%`;
+          if (stats.api_fluencyScore >= 70) {
             fluencyElement.classList.add('score-good');
             fluencyElement.classList.remove('score-bad');
           } else {

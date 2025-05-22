@@ -166,7 +166,7 @@ function calculateTranscriptStats(transcript) {
   // Calculate words per minute using the corrected speaking time
   let wpm = 0;
   if (speakingTimeSeconds > 0 && totalWords > 0) {
-    wpm = parseFloat(((totalWords / speakingTimeSeconds) * 60 * 1.1).toFixed(1));
+    wpm = parseFloat(((totalWords / speakingTimeSeconds) * 60).toFixed(1));
     console.log(`WPM calculation: (${totalWords} words / ${speakingTimeSeconds} seconds) * 60 = ${wpm}`);
   } else if (totalWords > 0) {
     // If for some reason we have words but no valid speaking time, estimate based on 1 word per second

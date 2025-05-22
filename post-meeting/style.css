@@ -931,6 +931,7 @@ h1 {
   gap: 16px;
   width: 100%;
   position: relative;
+  align-items: stretch;
 }
 .synonyms {
   background: var(--backgound-light-blue, #f3f8ff);
@@ -943,6 +944,7 @@ h1 {
   justify-content: flex-start;
   flex-shrink: 0;
   width: 348px;
+  height: 100%;
   position: relative;
 }
 .stronger-alternatives-to-the-words-you-used {
@@ -1163,6 +1165,7 @@ h1 {
   justify-content: flex-start;
   flex-shrink: 0;
   width: 348px;
+  height: 100%;
   position: relative;
 }
 .improve-phrasing-to-sound-more-like-a-native {
