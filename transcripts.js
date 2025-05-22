@@ -4,7 +4,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const transcriptTitle = document.getElementById('transcriptTitle');
   const transcriptTime = document.getElementById('transcriptTime');
   const clearAllBtn = document.getElementById('clearAllBtn');
-  const downloadCurrentBtn = document.getElementById('downloadCurrentBtn');
   
   // Add transcript stats elements
   const transcriptStats = document.createElement('div');
@@ -154,15 +153,24 @@ document.addEventListener('DOMContentLoaded', () => {
           currentTranscript = transcript;
           
           // Update the view
-          const meetingLabel = transcript.meetingId ? `<span class="meeting-id">Meeting: ${transcript.meetingId}</span>` : '';
-          transcriptTitle.innerHTML = `Call from ${transcript.formattedDate} ${meetingLabel}`;
-          transcriptTime.textContent = `Recorded at ${new Date(transcript.timestamp).toLocaleTimeString()}`;
+          // Remove the meeting ID from the title
+          transcriptTitle.innerHTML = `Call from ${transcript.formattedDate}`;
+          
+          // Display meeting ID in the transcriptTime element
+          if (transcript.meetingId) {
+            transcriptTime.textContent = `Meeting: ${transcript.meetingId}`;
+          } else {
+            transcriptTime.textContent = ''; // Empty if no meeting ID
+          }
+          
+          // Set the full feedback link to the post-meeting page
+          const fullFeedbackLink = document.getElementById('fullFeedbackLink');
+          if (fullFeedbackLink) {
+            fullFeedbackLink.href = `post_meeting.html?id=${transcript.id}`;
+          }
           
           // Show the view
           transcriptView.style.display = 'block';
-          
-          // Enable the download button
-          downloadCurrentBtn.disabled = false;
           
           // Highlight the selected item
           document.querySelectorAll('.transcript-item').forEach(item => {
@@ -313,44 +321,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }, () => {
         loadTranscripts();
         transcriptView.style.display = 'none';
-        downloadCurrentBtn.disabled = true;
       });
     }
-  });
-  
-  // Download current transcript
-  downloadCurrentBtn.addEventListener('click', () => {
-    if (!currentTranscript) return;
-    
-    // Create a timestamp for the filename
-    const timestamp = new Date(currentTranscript.timestamp)
-      .toISOString()
-      .replace(/[:.]/g, '-');
-    
-    // Get the stats
-    TranscriptStats.getTranscriptStats(currentTranscript.id, (stats) => {
-      // Include stats in the CSV if available
-      let statsInfo = '';
-      if (stats) {
-        statsInfo = `\nTotal Words,${stats.total_words || 0}\nUnique Words,${stats.unique_words_amount}\nWords Per Minute,${stats.words_per_minute}\nMeeting Duration,${stats.meeting_length}\nYour Speaking Time,${stats.speaking_time}`;
-      }
-      
-      // Create CSV content
-      const csvContent = `Timestamp,Meeting ID,Transcript${statsInfo}\n${currentTranscript.timestamp},"${currentTranscript.meetingId || ''}","${currentTranscript.text.replace(/"/g, '""')}"`;
-      
-      // Create download link
-      const encodedUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
-      const link = document.createElement('a');
-      link.setAttribute('href', encodedUri);
-      link.setAttribute('download', `transcript_${timestamp}.csv`);
-      document.body.appendChild(link);
-      
-      // Trigger download
-      link.click();
-      
-      // Clean up
-      document.body.removeChild(link);
-    });
   });
   
   // Check for unfinished sessions first

@@ -18,8 +18,8 @@
       --white: #ffffff;
       --text: #3C3C3C;
       --text-light: #5f6368;
-      --blue: #4285f4;
-      --blue-dark: #1a73e8;
+      --blue: #0957d0;
+      --blue-dark: #0957d0;
       --blue-light: #e8f0fe;
       --green: #0f9d58;
       --red: #ea4335;
@@ -43,8 +43,28 @@
       color: var(--text);
     }
     
+    .app-header {
+      position: absolute;
+      top: 22px;
+      right: 10px;
+      align-items: center;
+      display: flex;
+      gap: 6px;
+    }
+    
+    .app-icon {
+      width: 22px;
+      height: 22px;
+    }
+    
+    .app-title {
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 500;
+    }
+    
     h1 {
-      color: var(--blue-dark);
+      color: var(--text);
       margin-bottom: 12px;
       font-size: 32px;
       font-weight: 500;
@@ -167,8 +187,7 @@
     .toolbar {
       display: flex;
       gap: 12px;
-      margin-bottom: 24px;
-      padding: 0 8px;
+      margin-top: 24px;
     }
     
     button {
@@ -202,13 +221,6 @@
       padding: 60px 0;
       color: var(--text-light);
       font-size: 16px;
-    }
-    
-    .transcript-time {
-      font-size: 14px;
-      color: var(--text-light);
-      margin-top: 4px;
-      margin-bottom: 16px;
     }
     
     .meeting-id {
@@ -323,14 +335,64 @@
     ::-webkit-scrollbar-thumb:hover {
       background: #a0a0a0;
     }
+
+    .app-header-spacer {
+      position: relative;
+    }
+
+    .feedback-button-container {
+      margin-top: 24px;
+      text-align: center;
+    }
+    
+    .feedback-button {
+      display: inline-block;
+      padding: 14px 24px;
+      background-color: var(--blue);
+      color: white;
+      text-decoration: none;
+      border-radius: 8px;
+      font-family: 'Google Sans', sans-serif;
+      font-weight: 500;
+      font-size: 16px;
+      transition: all 0.2s;
+      box-shadow: var(--shadow);
+    }
+    
+    .feedback-button:hover {
+      background-color: var(--blue-dark);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+      transform: translateY(-1px);
+    }
+
+    .feedback-link-container {
+      margin-top: 12px;
+      text-align: center;
+    }
+    
+    .feedback-link {
+      color: var(--blue);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    
+    .feedback-link:hover {
+      text-decoration: underline;
+      color: var(--blue-dark);
+    }
   </style>
 </head>
 <body>
-  <h1>Calls History</h1>
-  
-  <div class="toolbar">
-    <button id="clearAllBtn">Clear All History</button>
-    <button id="downloadCurrentBtn" disabled>Download Current Call</button>
+
+  <div class="app-header-spacer">
+    <h1>Calls History</h1>
+    <div class="app-header">
+      <img src="icon48.png" alt="Logo" class="app-icon">
+      <div class="app-title">Google Meet English Checker</div>
+  </div>
+    
   </div>
   
   <div class="transcript-list" id="transcriptList">
@@ -341,6 +403,12 @@
   <div class="transcript-view" id="transcriptView" style="display: none;">
     <h2 id="transcriptTitle">Transcript</h2>
     <div class="transcript-time" id="transcriptTime"></div>
+    <div class="feedback-link-container">
+      <a id="fullFeedbackLink" class="feedback-link" href="#" target="_blank">Review Call Feedback</a>
+    </div>
+  </div>
+  <div class="toolbar">
+    <button id="clearAllBtn">Clear Calls History</button>
   </div>
 
   <script src="transcripts.js"></script>
