@@ -3,6 +3,7 @@ let isRecording = false;
 let lastTranscript = '';
 let sessionId = null;
 let recognition = null;
+let recognitionRunning = false;
 let startTime = null;
 let retryCount = 0;
 const MAX_RETRIES = 3;
@@ -23,6 +24,28 @@ let isCurrentCallEnglish = true;
 let isEnglish = null;
 let currentMeetingCode = null;
 const NON_ENGLISH_BLOCK_EXPIRATION_MS = 60 * 60 * 1000; // 1 hour in milliseconds
+
+// Helper function to safely start recognition
+function safeStartRecognition() {
+  if (!recognition) {
+    console.error('Recognition object not initialized');
+    return false;
+  }
+  
+  if (recognitionRunning) {
+    console.log('Recognition is already running, skipping start');
+    return false;
+  }
+  
+  try {
+    recognition.start();
+    console.log("Recognition start attempted");
+    return true;
+  } catch (e) {
+    console.error('Error starting recognition:', e);
+    return false;
+  }
+}
 
 // Function to generate a unique session ID
 function generateSessionId() {
@@ -88,18 +111,39 @@ async function getOrSetUserID_content() {
     });
 }
 
+// Function to preprocess transcript text by removing timestamps
+function preprocessTranscriptText(text) {
+  if (!text) return text;
+  
+  // First, handle consecutive timestamps by replacing them with periods
+  // This matches two timestamps in a row (E followed by S, or S followed by E)
+  let processedText = text.replace(/\[E:\d+(?:\.\d+)?s\]\s*\[S:\d+(?:\.\d+)?s\]/g, '.');
+  
+  // Remove any remaining individual timestamps
+  processedText = processedText.replace(/\[(?:S|E):\d+(?:\.\d+)?s\]/g, '');
+  
+  // Clean up extra spaces and normalize spacing around periods
+  processedText = processedText.replace(/\s*\.\s*/g, '. ');
+  processedText = processedText.replace(/\s+/g, ' ').trim();
+  
+  return processedText;
+}
+
 // Function to check if language is English
 async function checkLanguageIsEnglish(text) {
   if (!text) return true;
   
-  const logMessage = `Checking language for text: \"${text.substring(0, 30)}${text.length > 30 ? '...' : ''}\"`;
+  // Preprocess the text to remove timestamps
+  const preprocessedText = preprocessTranscriptText(text);
+  
+  const logMessage = `Checking language for text: \"${preprocessedText.substring(0, 30)}${preprocessedText.length > 30 ? '...' : ''}\"`;
   console.log("[Language Detection]", logMessage);
   sendLanguageDetectionLog(logMessage);
   
-  console.log("[Language Detection] Text length:", text.length, "characters");
-  sendLanguageDetectionLog(`Text length: ${text.length} characters`);
+  console.log("[Language Detection] Text length:", preprocessedText.length, "characters");
+  sendLanguageDetectionLog(`Text length: ${preprocessedText.length} characters`);
   
-  const trimmedText = text.substring(0, 250); // Respect the 250 char limit
+  const trimmedText = preprocessedText.substring(0, 500); // Respect the 500 char limit
   const userID = await getOrSetUserID_content();
   const payload = { text: trimmedText, userID: userID };
   const requestBody = JSON.stringify(payload);
@@ -801,6 +845,8 @@ function cleanupRecognition() {
     recognition = null;
   }
   
+  recognitionRunning = false; // Reset flag when cleaning up
+  
   // Also clean up the audio stream if it exists
   if (window.recognitionStream) {
     try {
@@ -901,7 +947,8 @@ function startRecording() {
       recognition.onstart = () => {
         console.log("Recognition started successfully");
         isRecording = true;
-        retryCount = 0; // Reset retry count on successful start
+        recognitionRunning = true;
+        retryCount = 0;
         updateRecordingStatus();
         chrome.runtime.sendMessage({
           type: 'debug',
@@ -1079,7 +1126,7 @@ function startRecording() {
                 type: 'debug',
                 text: 'Attempting to restart recognition after error'
               });
-              recognition.start();
+              safeStartRecognition(); // Use safe start instead of direct start
             }
           }, 1000);
         }
@@ -1087,14 +1134,13 @@ function startRecording() {
 
       recognition.onend = () => {
         console.log('Recognition ended');
+        recognitionRunning = false; // Clear flag when recognition ends
         // If we're still supposed to be recording, restart
         if (isRecording) {
           console.log('Restarting recognition...');
-          try {
-            recognition.start();
-          } catch (e) {
-            console.error('Error restarting recognition:', e);
-          }
+          setTimeout(() => {
+            safeStartRecognition(); // Use safe start instead of direct start
+          }, 100); // Small delay to ensure cleanup
         } else {
           // We're intentionally stopping, send the final transcript
           console.log('Recording stopped');
@@ -1115,7 +1161,7 @@ function startRecording() {
 
       // Start recognition after all event handlers are set up
       try {
-        recognition.start();
+        safeStartRecognition(); // Use safe start instead of direct start
         console.log("Recognition started");
       } catch (e) {
         console.error('Error starting recognition:', e);
@@ -1581,6 +1627,7 @@ function startStandardRecognition() {
     recognition.onstart = () => {
       console.log("Standard recognition started successfully");
       isRecording = true;
+      recognitionRunning = true; // Set flag when recognition starts
       retryCount = 0;
       updateRecordingStatus();
       chrome.runtime.sendMessage({
@@ -1730,7 +1777,7 @@ function startStandardRecognition() {
     };
     
     // Start recognition directly without enhanced audio
-    recognition.start();
+    safeStartRecognition(); // Use safe start instead of direct start
     console.log("Standard recognition started");
   } catch (error) {
     console.error('Error starting standard recognition:', error);

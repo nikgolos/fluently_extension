@@ -373,9 +373,22 @@ function updateMeetingInfo(formattedDateFromStorage) { // transcriptId is no lon
     }
 }
 
-// Remove timestamps in [HH:MM:SS] format from text
-function stripTimestamps(text) {
-    return text.replace(/\[\d{2}:\d{2}:\d{2}\]\s?/g, '');
+// Function to preprocess transcript text by removing timestamps (same as in content.js)
+function preprocessTranscriptText(text) {
+  if (!text) return text;
+  
+  // First, handle consecutive timestamps by replacing them with periods
+  // This matches two timestamps in a row (E followed by S, or S followed by E)
+  let processedText = text.replace(/\[E:\d+(?:\.\d+)?s\]\s*\[S:\d+(?:\.\d+)?s\]/g, '.');
+  
+  // Remove any remaining individual timestamps
+  processedText = processedText.replace(/\[(?:S|E):\d+(?:\.\d+)?s\]/g, '');
+  
+  // Clean up extra spaces and normalize spacing around periods
+  processedText = processedText.replace(/\s*\.\s*/g, '. ');
+  processedText = processedText.replace(/\s+/g, ' ').trim();
+  
+  return processedText;
 }
 
 // Show loader in a specific tab body
@@ -515,7 +528,7 @@ async function loadGrammarData() {
             console.log('Using stored grammar data instead of API call');
             grammarData = storedGrammarData;
         } else {
-        const cleanText = stripTimestamps(transcriptText);
+        const cleanText = preprocessTranscriptText(transcriptText);
             const apiGrammarResponse = await apiService.getGrammarAnalysis(cleanText);
             grammarData = apiGrammarResponse; // Use API response
             
@@ -781,7 +794,7 @@ async function loadVocabularyData() {
             vocabularyData = storedVocabularyData;
         } else {
         // Strip timestamps before sending to API
-        const cleanText = stripTimestamps(transcriptText);
+        const cleanText = preprocessTranscriptText(transcriptText);
         
         // Get vocabulary data from API
             const apiVocabularyResponse = await apiService.getVocabularyAnalysis(cleanText);
@@ -1328,7 +1341,7 @@ async function loadGeneralStats() {
                 feedback: storedApiStats.api_feedback
             };
         } else {
-            const cleanText = stripTimestamps(transcriptText);
+            const cleanText = preprocessTranscriptText(transcriptText);
             const apiResponse = await apiService.getEnglishStats(cleanText);
             console.log('Raw english_stats API response:', apiResponse);
             statsData = apiResponse; // Keep raw API response initially
