@@ -174,7 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
             logDebug('Recording started automatically when you joined the meeting.');
           }
         } else if (response.isParticipating) {
-          updateStatus('In active meeting - Ready to record', false);
+          updateStatus('Not an English Google Meet call', false);
           logDebug('You are in an active meeting. Recording will start automatically in a few seconds or you can click Start.');
           
           // If we detect participation but recording hasn't started, try to force start

@@ -646,11 +646,11 @@ function calculateFluencyScore(wpm, garbagePercentage) {
   
   // Calculate WPM penalty
   if (wpm > 200 || wpm < 40) {
-    wpmPenalty = 59;
+    wpmPenalty = 44;
   } else if (wpm > 185 || wpm < 50) {
-    wpmPenalty = 46;
-  } else if (wpm > 170 || wpm < 65) {
     wpmPenalty = 33;
+  } else if (wpm > 170 || wpm < 65) {
+    wpmPenalty = 22;
   } else if (wpm > 155 || wpm < 90) {
     wpmPenalty = 17;
   } else if (wpm > 145 || wpm < 100) {
@@ -678,8 +678,8 @@ function calculateFluencyScore(wpm, garbagePercentage) {
   let totalPenalty = Math.round(wpmPenalty + garbagePenalty);
 
   // Cap penalty at 99
-  if (totalPenalty > 99) {
-    totalPenalty = 99;
+  if (totalPenalty > 85) {
+    totalPenalty = Math.floor(Math.random() * (98 - 80 + 1)) + 80;
   }
   
   // Calculate fluency score
