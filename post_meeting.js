@@ -192,8 +192,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const estimatedSpeakingTimeSeconds = Math.max(Math.round(totalWords / 150 * 60), 1);
     const speakingTime = formatTimeDisplay(estimatedSpeakingTimeSeconds);
     
-    // Estimate words per minute
-    const wpm = Math.round(totalWords / (estimatedSpeakingTimeSeconds / 60));
+    // Estimate words per minute and adjust for pauses (85% of the estimated time)
+    const wpm = Math.round(totalWords / (estimatedSpeakingTimeSeconds / 60) * 0.85);
     
     // We can't calculate garbage words properly without the dictionary,
     // so we'll provide a placeholder with zero values

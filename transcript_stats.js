@@ -166,12 +166,12 @@ function calculateTranscriptStats(transcript) {
   // Calculate words per minute using the corrected speaking time
   let wpm = 0;
   if (speakingTimeSeconds > 0 && totalWords > 0) {
-    wpm = parseFloat(((totalWords / speakingTimeSeconds) * 60).toFixed(1));
+    wpm = parseFloat(((totalWords / speakingTimeSeconds) * 60 * 0.85).toFixed(1));
     console.log(`WPM calculation: (${totalWords} words / ${speakingTimeSeconds} seconds) * 60 = ${wpm}`);
   } else if (totalWords > 0) {
     // If for some reason we have words but no valid speaking time, estimate based on 1 word per second
     const estimatedSeconds = Math.max(totalWords, 1);
-    wpm = parseFloat(((totalWords / estimatedSeconds) * 60).toFixed(1));
+    wpm = parseFloat(((totalWords / estimatedSeconds) * 60 * 0.85).toFixed(1));
     console.log(`Estimated WPM: (${totalWords} words / ${estimatedSeconds} estimated seconds) * 60 = ${wpm}`);
   }
   
@@ -451,7 +451,7 @@ function calculateWordsPerMinute(text, totalWords = null) {
   
   // Calculate words per minute
   if (totalSpeakingTimeSeconds > 0) {
-    const wpm = (totalWords / totalSpeakingTimeSeconds) * 60;
+    const wpm = (totalWords / totalSpeakingTimeSeconds) * 60 * 0.85;
     console.log(`WPM calculation: (${totalWords} words / ${totalSpeakingTimeSeconds} seconds) * 60 = ${wpm}`);
     return parseFloat(wpm.toFixed(2)); // Round to 2 decimal places
   } else if (totalWords > 0) {
@@ -465,7 +465,7 @@ function calculateWordsPerMinute(text, totalWords = null) {
       const totalDuration = lastTimestamp - firstTimestamp;
       
       if (totalDuration > 0) {
-        const estimatedWpm = (totalWords / totalDuration) * 60;
+        const estimatedWpm = (totalWords / totalDuration) * 60 * 0.85;
         console.log(`Estimated WPM based on total duration: (${totalWords} words / ${totalDuration} seconds) * 60 = ${estimatedWpm}`);
         return parseFloat(estimatedWpm.toFixed(2));
       }

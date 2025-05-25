@@ -24,6 +24,9 @@ let isCurrentCallEnglish = true;
 let isEnglish = null;
 let currentMeetingCode = null;
 const NON_ENGLISH_BLOCK_EXPIRATION_MS = 60 * 60 * 1000; // 1 hour in milliseconds
+// Speech timing variables
+let currentSpeechStartTime = null;
+let hasInterimResults = false;
 
 // Helper function to safely start recognition
 function safeStartRecognition() {
@@ -934,9 +937,6 @@ function startRecording() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     recognition = new SpeechRecognition();
     
-    // Add custom property to track speech start time
-    recognition.speechStartTime = null;
-    
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
@@ -971,25 +971,32 @@ function startRecording() {
           }
         }
 
+        // Track speech start time when first interim result appears
+        if (interimTranscript && !hasInterimResults) {
+          currentSpeechStartTime = new Date();
+          hasInterimResults = true;
+        }
+
         // Process final transcript
         if (finalTranscript) {
           const now = new Date();
           const endTimeSinceStart = ((now - startTime) / 1000).toFixed(1);
           
-          // Use the recorded speech start time if available, otherwise estimate it
+          // Only use actual recorded speech start time, no estimations
           let startTimeSinceStart;
-          if (recognition.speechStartTime) {
-            startTimeSinceStart = ((recognition.speechStartTime - startTime) / 1000).toFixed(1);
+          if (currentSpeechStartTime) {
+            startTimeSinceStart = ((currentSpeechStartTime - startTime) / 1000).toFixed(1);
+            
+            // Format with start and end timecodes - using same format as main handler
+            const formattedTranscript = `[S:${startTimeSinceStart}s] ${finalTranscript} [E:${endTimeSinceStart}s]`;
+            
+            console.log('Adding to memory:', formattedTranscript);
+            lastTranscript = lastTranscript + ' ' + formattedTranscript;
           } else {
-            // Fallback: estimate based on transcript length
-            const approximateDurationInSeconds = finalTranscript.length / 5;
-            startTimeSinceStart = Math.max(0, (endTimeSinceStart - approximateDurationInSeconds).toFixed(1));
+            // No estimation - just add the transcript without timestamps
+            lastTranscript = lastTranscript + ' ' + finalTranscript;
           }
           
-          // Format with start and end timecodes - using same format as main handler
-          const formattedTranscript = `[S:${startTimeSinceStart}s] ${finalTranscript} [E:${endTimeSinceStart}s]`;
-          
-          lastTranscript = lastTranscript + ' ' + formattedTranscript;
           chrome.runtime.sendMessage({
             type: 'transcriptUpdate',
             sessionId: sessionId,
@@ -997,8 +1004,9 @@ function startRecording() {
             isFinal: true
           });
           
-          // Reset speech start time for the next segment
-          recognition.speechStartTime = null;
+          // Reset speech timing for the next segment
+          currentSpeechStartTime = null;
+          hasInterimResults = false;
           
           // Save on significant transcript updates
           saveTranscriptSegment();
@@ -1078,10 +1086,6 @@ function startRecording() {
 
       recognition.onsoundstart = () => {
         console.log("Sound detected");
-        // Record speech start time
-        if (!recognition.speechStartTime) {
-          recognition.speechStartTime = new Date();
-        }
         chrome.runtime.sendMessage({
           type: 'debug',
           text: 'Sound detected'
@@ -1620,10 +1624,6 @@ function logAudioStreamInfo(stream) {
 // Add this helper function to fall back to standard recognition if enhanced setup fails
 function startStandardRecognition() {
   try {
-    // Add custom property to track speech start time
-    recognition.speechStartTime = null;
-    
-    // Set up standard event handlers
     recognition.onstart = () => {
       console.log("Standard recognition started successfully");
       isRecording = true;
@@ -1639,10 +1639,6 @@ function startStandardRecognition() {
     // Add sound start/end handlers to track speech timing
     recognition.onsoundstart = () => {
       console.log("Sound detected in standard recognition");
-      // Record speech start time
-      if (!recognition.speechStartTime) {
-        recognition.speechStartTime = new Date();
-      }
       chrome.runtime.sendMessage({
         type: 'debug',
         text: 'Sound detected'
@@ -1671,25 +1667,32 @@ function startStandardRecognition() {
         }
       }
 
+      // Track speech start time when first interim result appears
+      if (interimTranscript && !hasInterimResults) {
+        currentSpeechStartTime = new Date();
+        hasInterimResults = true;
+      }
+
       // Process final transcript
       if (finalTranscript) {
         const now = new Date();
         const endTimeSinceStart = ((now - startTime) / 1000).toFixed(1);
         
-        // Use the recorded speech start time if available, otherwise estimate it
+        // Only use actual recorded speech start time, no estimations
         let startTimeSinceStart;
-        if (recognition.speechStartTime) {
-          startTimeSinceStart = ((recognition.speechStartTime - startTime) / 1000).toFixed(1);
+        if (currentSpeechStartTime) {
+          startTimeSinceStart = ((currentSpeechStartTime - startTime) / 1000).toFixed(1);
+          
+          // Format with start and end timecodes - using same format as main handler
+          const formattedTranscript = `[S:${startTimeSinceStart}s] ${finalTranscript} [E:${endTimeSinceStart}s]`;
+          
+          console.log('Adding to memory:', formattedTranscript);
+          lastTranscript = lastTranscript + ' ' + formattedTranscript;
         } else {
-          // Fallback: estimate based on transcript length
-          const approximateDurationInSeconds = finalTranscript.length / 5;
-          startTimeSinceStart = Math.max(0, (endTimeSinceStart - approximateDurationInSeconds).toFixed(1));
+          // No estimation - just add the transcript without timestamps
+          lastTranscript = lastTranscript + ' ' + finalTranscript;
         }
         
-        // Format with start and end timecodes - using same format as main handler
-        const formattedTranscript = `[S:${startTimeSinceStart}s] ${finalTranscript} [E:${endTimeSinceStart}s]`;
-        
-        lastTranscript = lastTranscript + ' ' + formattedTranscript;
         chrome.runtime.sendMessage({
           type: 'transcriptUpdate',
           sessionId: sessionId,
@@ -1697,8 +1700,9 @@ function startStandardRecognition() {
           isFinal: true
         });
         
-        // Reset speech start time for the next segment
-        recognition.speechStartTime = null;
+        // Reset speech timing for the next segment
+        currentSpeechStartTime = null;
+        hasInterimResults = false;
         
         // Save on significant transcript updates
         saveTranscriptSegment();
