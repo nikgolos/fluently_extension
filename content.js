@@ -1,32 +1,82 @@
-let hasReportedFinalTranscript = false;
-let isRecording = false;
-let lastTranscript = '';
-let sessionId = null;
-let recognition = null;
-let recognitionRunning = false;
-let startTime = null;
-let retryCount = 0;
-const MAX_RETRIES = 3;
-let autoStarted = false;
-let meetingDetectionInterval = null;
-let meetingEndCheckInterval = null;
-let autoSaveInterval = null;
-let lastSavedLength = 0;
+if (typeof hasReportedFinalTranscript === 'undefined') {
+  var hasReportedFinalTranscript = false;
+}
+if (typeof isRecording === 'undefined') {
+  var isRecording = false;
+}
+if (typeof lastTranscript === 'undefined') {
+  var lastTranscript = '';
+}
+if (typeof sessionId === 'undefined') {
+  var sessionId = null;
+}
+if (typeof recognition === 'undefined') {
+  var recognition = null;
+}
+if (typeof recognitionRunning === 'undefined') {
+  var recognitionRunning = false;
+}
+if (typeof startTime === 'undefined') {
+  var startTime = null;
+}
+if (typeof retryCount === 'undefined') {
+  var retryCount = 0;
+}
+if (typeof MAX_RETRIES === 'undefined') {
+  var MAX_RETRIES = 3;
+}
+if (typeof autoStarted === 'undefined') {
+  var autoStarted = false;
+}
+if (typeof meetingDetectionInterval === 'undefined') {
+  var meetingDetectionInterval = null;
+}
+if (typeof meetingEndCheckInterval === 'undefined') {
+  var meetingEndCheckInterval = null;
+}
+if (typeof autoSaveInterval === 'undefined') {
+  var autoSaveInterval = null;
+}
+if (typeof lastSavedLength === 'undefined') {
+  var lastSavedLength = 0;
+}
 // For language detection
-let wordCount = 0;
-let hasCheckedLanguage = false;
-const LANGUAGE_DETECTION_WORD_THRESHOLD = 50;
-const LANGUAGE_DETECTION_SAMPLE_SIZE = 50;
-const LANGUAGE_DETECTION_CONFIDENCE_THRESHOLD = 59;
+if (typeof wordCount === 'undefined') {
+  var wordCount = 0;
+}
+if (typeof hasCheckedLanguage === 'undefined') {
+  var hasCheckedLanguage = false;
+}
+if (typeof LANGUAGE_DETECTION_WORD_THRESHOLD === 'undefined') {
+  var LANGUAGE_DETECTION_WORD_THRESHOLD = 50;
+}
+if (typeof LANGUAGE_DETECTION_SAMPLE_SIZE === 'undefined') {
+  var LANGUAGE_DETECTION_SAMPLE_SIZE = 50;
+}
+if (typeof LANGUAGE_DETECTION_CONFIDENCE_THRESHOLD === 'undefined') {
+  var LANGUAGE_DETECTION_CONFIDENCE_THRESHOLD = 59;
+}
 // Flag to mark if current call is non-English
-let isCurrentCallEnglish = true;
+if (typeof isCurrentCallEnglish === 'undefined') {
+  var isCurrentCallEnglish = true;
+}
 // Flag to mark if current session is English
-let isEnglish = null;
-let currentMeetingCode = null;
-const NON_ENGLISH_BLOCK_EXPIRATION_MS = 60 * 60 * 1000; // 1 hour in milliseconds
+if (typeof isEnglish === 'undefined') {
+  var isEnglish = null;
+}
+if (typeof currentMeetingCode === 'undefined') {
+  var currentMeetingCode = null;
+}
+if (typeof NON_ENGLISH_BLOCK_EXPIRATION_MS === 'undefined') {
+  var NON_ENGLISH_BLOCK_EXPIRATION_MS = 60 * 60 * 1000; // 1 hour in milliseconds
+}
 // Speech timing variables
-let currentSpeechStartTime = null;
-let hasInterimResults = false;
+if (typeof currentSpeechStartTime === 'undefined') {
+  var currentSpeechStartTime = null;
+}
+if (typeof hasInterimResults === 'undefined') {
+  var hasInterimResults = false;
+}
 
 // Helper function to safely start recognition
 function safeStartRecognition() {
@@ -665,7 +715,9 @@ function startMeetingEndDetection() {
 initialize();
 
 // Listen for URL changes (for single-page applications like Google Meet)
-let lastUrl = window.location.href;
+if (typeof lastUrl === 'undefined') {
+  var lastUrl = window.location.href;
+}
 new MutationObserver(() => {
   if (lastUrl !== window.location.href) {
     lastUrl = window.location.href;
