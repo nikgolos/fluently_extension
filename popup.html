@@ -201,6 +201,31 @@
       transform: translateY(2px);
     }
     
+    .secondary-button {
+      background: transparent;
+      color: var(--text-light);
+      border: none;
+      border-radius: var(--radius);
+      font-family: var(--font);
+      font-size: 15px;
+      font-weight: 700;
+      padding: 14px 16px;
+      width: 100%;
+      cursor: pointer;
+      transition: all 0.1s ease;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 8px;
+    }
+    
+    .secondary-button:hover {
+      color: var(--text);
+    }
+    
+    .secondary-button:active {
+      transform: translateY(1px);
+    }
+    
     .button-container {
       width: 100%;
       padding: 0 16px;
@@ -308,6 +333,7 @@
     
     <div class="button-container">
       <button class="primary-button" id="viewTranscriptsButton">View Calls History</button>
+      <button class="secondary-button" id="openGoogleMeetButton">Open Google Meet</button>
       
       <div class="feedback-container" style="margin-top: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer;" id="feedbackButton">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 8px; color: var(--text-light);">

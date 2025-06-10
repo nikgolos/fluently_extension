@@ -198,6 +198,14 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.runtime.sendMessage({ type: 'openTranscriptsPage' });
   });
 
+  // Open Google Meet button handler
+  const openGoogleMeetButton = document.getElementById('openGoogleMeetButton');
+  if (openGoogleMeetButton) {
+    openGoogleMeetButton.addEventListener('click', () => {
+      chrome.tabs.create({ url: 'https://meet.google.com/landing' });
+    });
+  }
+
   // Listen for messages from the content script and background
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log("Message received in popup:", message);
