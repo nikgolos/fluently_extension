@@ -694,7 +694,7 @@ function createGrammarError(mistake) {
     // Create info icon with tooltip
     const infoCircle = document.createElement('div');
     infoCircle.className = 'info-circle-fill-1';
-    infoCircle.innerHTML = '<img class="group" src="post-meeting/src/group0.svg" />';
+    infoCircle.innerHTML = '<img class="group" src="post-meeting/src/info.circle.fill.svg" />';
     
     // Add tooltip data attribute for custom tooltip
     infoCircle.dataset.tooltip = mistake.explanation;
@@ -984,7 +984,7 @@ function createSynonymCard(synonym) {
         // Create info icon with tooltip
         const infoCircle = document.createElement('div');
         infoCircle.className = 'info-circle-fill-1';
-        infoCircle.innerHTML = '<img class="group" src="post-meeting/src/group0.svg"/>';
+        infoCircle.innerHTML = '<img class="group" src="post-meeting/src/info.circle.fill.svg"/>';
         infoCircle.dataset.tooltip = synonym.explanation || 'This alternative vocabulary will make your speech sound more professional.';
         
         card.appendChild(infoCircle);
@@ -1094,7 +1094,7 @@ function createRephrasingCard(rephrasing) {
         // Create info icon with tooltip
         const infoCircle = document.createElement('div');
         infoCircle.className = 'info-circle-fill-1';
-        infoCircle.innerHTML = '<img class="group" src="post-meeting/src/group0.svg"/>';
+        infoCircle.innerHTML = '<img class="group" src="post-meeting/src/info.circle.fill.svg"/>';
         infoCircle.dataset.tooltip = rephrasing.explanation || 'This rephrasing sounds more natural to native speakers.';
         
         card.appendChild(infoCircle);
