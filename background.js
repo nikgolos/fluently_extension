@@ -445,8 +445,12 @@ function saveTranscriptToStorage(text, sender, sessionId, meetingCode, isEnglish
 // Function to create a temporary tab for stats when needed
 function createTemporaryTabForStats(transcriptEntry) {
   console.log("Creating temporary background tab for stats calculation");
+  
+  // Use a data URL instead of about:blank to avoid origin issues
+  const dataUrl = 'data:text/html,<html><head><title>Stats</title></head><body></body></html>';
+  
   chrome.tabs.create({ 
-    url: 'about:blank',
+    url: dataUrl,
     active: false
   }, (tab) => {
     // Set a timeout to ensure the tab gets closed even if something fails

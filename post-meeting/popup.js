@@ -197,13 +197,32 @@ class PopupManager {
             scoreValueElement.style.color = color;
         }
 
-        // Generate and display random message
-        const messages = this.generateMessages(score, stats);
+        // Get transcript ID to save/load message
+        const urlParams = new URLSearchParams(window.location.search);
+        const transcriptId = urlParams.get('id');
         
-        if (messages.length > 0 && messageElement) {
-            const randomIndex = Math.floor(Math.random() * messages.length);
-            const selectedMessage = messages[randomIndex];
-            messageElement.textContent = selectedMessage;
+        if (messageElement && transcriptId) {
+            // Check if we already have a saved message for this meeting
+            chrome.storage.local.get([`popup_message_${transcriptId}`], (result) => {
+                const savedMessage = result[`popup_message_${transcriptId}`];
+                
+                if (savedMessage) {
+                    // Use saved message
+                    messageElement.textContent = savedMessage;
+                } else {
+                    // Generate new message and save it
+                    const messages = this.generateMessages(score, stats);
+                    
+                    if (messages.length > 0) {
+                        const randomIndex = Math.floor(Math.random() * messages.length);
+                        const selectedMessage = messages[randomIndex];
+                        messageElement.textContent = selectedMessage;
+                        
+                        // Save this message for future page loads
+                        chrome.storage.local.set({ [`popup_message_${transcriptId}`]: selectedMessage });
+                    }
+                }
+            });
         }
     }
 
