@@ -130,7 +130,7 @@ class PopupManager {
                 if (stats.api_englishScore !== undefined) {
                     // Data exists in storage - load immediately
                     englishScoreElement.textContent = stats.api_englishScore;
-                    this.updatePopupBasedOnScore(stats.api_englishScore);
+                    this.updatePopupBasedOnScore(stats.api_englishScore, stats);
                     hasEnglishScore = true;
                 } else {
                     console.log('No English score found, waiting for main page to fetch...');
@@ -155,11 +155,12 @@ class PopupManager {
         }
     }
 
-    // Update popup based on the user's English score
-    updatePopupBasedOnScore(score) {
+    // Update popup based on the user's English score and generate message
+    updatePopupBasedOnScore(score, stats = {}) {
         const titleElement = document.querySelector('.popup-feedback-title');
         const scoreStatElement = document.querySelector('.popup-stat-score');
         const scoreValueElement = document.querySelector('.popup-stat-value-score');
+        const messageElement = document.querySelector('.popup-message-text');
         
         let title = 'Amazing result!';
         let color = '#20AD14';
@@ -195,6 +196,126 @@ class PopupManager {
         if (scoreValueElement) {
             scoreValueElement.style.color = color;
         }
+
+        // Generate and display random message
+        const messages = this.generateMessages(score, stats);
+        
+        if (messages.length > 0 && messageElement) {
+            const randomIndex = Math.floor(Math.random() * messages.length);
+            const selectedMessage = messages[randomIndex];
+            messageElement.textContent = selectedMessage;
+        }
+    }
+
+    // Generate messages based on user stats
+    generateMessages(englishScore, stats) {
+        const messages = [];
+        
+        // Get user stats - ONLY use real data, no defaults
+        const wpm = stats.words_per_minute;
+        const grammarScore = stats.api_grammarScore;
+        const garbageData = stats.garbage_words;
+        const garbagePercentage = garbageData ? garbageData.garbagePercentage : undefined;
+        const topGarbageWords = garbageData ? garbageData.topGarbageWords : undefined;
+        
+        console.log('Generating messages with REAL stats only:', { wpm, grammarScore, garbagePercentage, topGarbageWords, englishScore });
+        
+        // Check WPM conditions - only if we have real WPM data
+        if (wpm !== undefined && wpm < 81) {
+            messages.push(
+                "If your plan was to put the whole meeting to sleep, you're crushing it. Pls, speak faster 🫠",
+                "If you speak that slowly again, I might have to help you leave the meeting 😉",
+                "If you speak that slowly again, I might have to help you leave the meeting 😉"
+            );
+        }
+        
+        if (wpm !== undefined && wpm > 165) {
+            messages.push(
+                `You just said ${Math.round(wpm)} words per minute. Are you okay? Chill out next time.`,
+                "You speak tooooo fast. Leave space for people to process what you said.",
+                "You speak tooooo fast. Leave space for people to process what you said."
+            );
+        }
+        
+        // Check grammar score - only if we have real grammar data
+        if (grammarScore !== undefined && grammarScore < 40) {
+            messages.push(
+                "Improve your grammar next time. That's not speaking English - that's bullying it.",
+                "Your English was almost correct! But it seems your grammar took the day off..",
+                "I'm not angry about your grammar mistakes. I'm just... disappointed 🔫",
+                "I'm not angry about your grammar mistakes. I'm just... disappointed 🔫",
+                "We've updated our privacy policy! Now I can judge your grammar legally 😉"
+            );
+        }
+        
+        // Check garbage percentage - only if we have real garbage data
+        if (garbagePercentage !== undefined && garbagePercentage > 5 && topGarbageWords) {
+            // Get top garbage word
+            let topWord = '';
+            let topCount = 0;
+            
+            for (const [word, count] of Object.entries(topGarbageWords)) {
+                if (count > topCount) {
+                    topWord = word;
+                    topCount = count;
+                }
+            }
+            
+            if (topWord && topCount > 0) {
+                const garbageMessage1 = `Another "${topWord}" on your call and I might just accidentally mute you permanently. Just saying.`;
+                const garbageMessage2 = `You said "${topWord}" ${topCount} times. The word deserves a break. Please stop.🙅`;
+                
+                // Add each message 3 times (total 6 strings)
+                for (let i = 0; i < 3; i++) {
+                    messages.push(garbageMessage1, garbageMessage2);
+                }
+            }
+        }
+        
+        // Check English score - only if we have real English score
+        if (englishScore !== undefined) {
+            if (englishScore < 30) {
+                messages.push(
+                    "You know what's cool? Progress. You should try it sometime.",
+                    "I'm not mad about your English. Just disappointed. And maybe a little mad. 🔪",
+                    "If you're trying to speak English really bad, you're doing an amazing job.",
+                    "Speak English like this one more time and see what happens. I dare you 🔫",
+                    "Trust me - on the English calls your mute button is your best friend 😉"
+                );
+            } else if (englishScore < 50) {
+                messages.push(
+                    "Speak English like this one more time and see what happens. I dare you 🔫",
+                    "I'm not mad about your English. Just disappointed. And maybe a little mad. 🔪"
+                );
+            } else if (englishScore > 60) {
+                messages.push(
+                    "Well done! You are allowed to make one more Google Meet call 🎉",
+                    "Well done! You are allowed to make one more Google Meet call 🎉",
+                    "Congratulations! You almost sounded fluent in that last call. Almost."
+                );
+            }
+            
+            if (englishScore > 79) {
+                messages.push(
+                    "Congrats! Your English was impressive. Your family is safe… for now. 😉",
+                    "Congrats! Your English was impressive. Your family is safe… for now. 😉",
+                    "Great job! Your colleagues have voted to remove you from the 'auto-mute' list 🥳",
+                    "Congratulations! You almost sounded fluent in that last call. Almost.",
+                    "Well done! You are allowed to make one more Google Meet call 🎉",
+                    "Well done! You are allowed to make one more Google Meet call 🎉"
+                );
+            }
+        }
+        
+        // If no messages were added, add default message
+        if (messages.length === 0) {
+            messages.push("Your English was almost fluent in that last call. Almost. Pls, imporove next time. 🔫");
+        }
+        
+        // Log the complete messages array after all calculations
+        console.log('Complete messages array after calculations:', messages);
+        
+        return messages;
     }
 
     // Show the popup with animation

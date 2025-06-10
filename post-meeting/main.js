@@ -97,20 +97,15 @@ async function initApp() {
             chrome.storage.local.get(['transcript_stats'], (result) => {
                 const allStats = result.transcript_stats || {};
                 if (allStats[transcriptId]) {
-                    console.log('[initApp] Found initial stored data for transcriptId:', allStats[transcriptId]);
                     initialStoredDataForTranscript = { ...allStats[transcriptId] }; // Shallow copy
-                } else {
-                    console.log('[initApp] No initial stored data found for transcriptId.');
-                }
+                } 
                 resolve();
             });
         });
 
         // 2. Calculate and display frontend-based stats (including Fluency)
         // This might modify storage and sets global `frontendStats`
-        console.log("[initApp] Starting frontend stats calculation...");
         await loadAndDisplayFrontendStats();
-        console.log("[initApp] Frontend stats calculation complete. Global frontendStats:", frontendStats);
 
         // 3. Determine if all necessary API-derived data was present in `initialStoredDataForTranscript`
         let wasApiDataInitiallyComplete = false;
@@ -122,25 +117,20 @@ async function initApp() {
             initialStoredDataForTranscript.api_feedback !== undefined) {
             // Note: we're not requiring api_summary anymore, only checking for api_feedback
             wasApiDataInitiallyComplete = true;
-            console.log('[initApp] All API-derived general stats were present in initial storage.');
         }
 
         let wasGrammarDataInitiallyComplete = false;
         if (initialStoredDataForTranscript && initialStoredDataForTranscript.grammarData) {
             wasGrammarDataInitiallyComplete = true;
-            console.log('[initApp] Grammar data was present in initial storage.');
         }
 
         let wasVocabularyDataInitiallyComplete = false;
         if (initialStoredDataForTranscript && initialStoredDataForTranscript.vocabularyData) {
             wasVocabularyDataInitiallyComplete = true;
-            console.log('[initApp] Vocabulary data was present in initial storage.');
         }
 
         // 4. Load General Stats (English Score, etc.)
-        console.log("[initApp] Starting General tab stats loading...");
         if (wasApiDataInitiallyComplete) {
-            console.log("[initApp] Using initially stored API stats for General tab.");
             statsData = {
                 general_score: initialStoredDataForTranscript.api_englishScore,
                 english_score: initialStoredDataForTranscript.api_englishScore,
@@ -156,42 +146,31 @@ async function initApp() {
             }
             displayGeneralStats(statsData);
         } else {
-            console.log("[initApp] API general stats not complete in initial storage. Calling loadGeneralStats() API...");
             await loadGeneralStats(); // This will fetch from API and save (merging)
         }
-        console.log("[initApp] General tab stats loading complete.");
 
         // 5. Load Grammar Data
-        console.log("[initApp] Starting Grammar tab data loading...");
         if (wasGrammarDataInitiallyComplete) {
-            console.log("[initApp] Using initially stored grammar data.");
             grammarData = initialStoredDataForTranscript.grammarData;
             displayGrammarData(grammarData);
         } else {
-            console.log("[initApp] Grammar data not found in initial storage. Calling loadGrammarData() API...");
             await loadGrammarData(); // Will fetch and save (merging)
         }
-        console.log("[initApp] Grammar tab data loading complete.");
 
         // 6. Load Vocabulary Data
-        console.log("[initApp] Starting Vocabulary tab data loading...");
         if (wasVocabularyDataInitiallyComplete) {
-            console.log("[initApp] Using initially stored vocabulary data.");
             vocabularyData = initialStoredDataForTranscript.vocabularyData;
             displayVocabularyData(vocabularyData);
             const suggestionsCount = countVocabularySuggestions(vocabularyData);
             updateVocabularyBadgeCount(suggestionsCount);
             updateVocabularyParagraph(suggestionsCount);
         } else {
-            console.log("[initApp] Vocabulary data not found in initial storage. Calling loadVocabularyData() API...");
             await loadVocabularyData(); // Will fetch and save (merging)
         }
-        console.log("[initApp] Vocabulary tab data loading complete.");
         
         // 7. Final re-save if data was initially complete, to ensure frontend calculations don't wipe API parts.
         // This merges the critical API-derived data back if `loadAndDisplayFrontendStats` overwrote parts of the record.
         if (wasApiDataInitiallyComplete || wasGrammarDataInitiallyComplete || wasVocabularyDataInitiallyComplete) {
-            console.log('[initApp] Re-saving initially complete data to ensure persistence after frontend calculations.');
             await new Promise(resolve => {
                 chrome.storage.local.get(['transcript_stats'], (result) => {
                     const allStatsForSave = result.transcript_stats || {};
@@ -235,7 +214,6 @@ async function initApp() {
 
                     allStatsForSave[transcriptId] = updatedData;
                     chrome.storage.local.set({ transcript_stats: allStatsForSave }, () => {
-                        console.log('[initApp] Final re-save complete. Current data for transcriptId:', allStatsForSave[transcriptId]);
                         resolve();
                     });
                 });
@@ -853,8 +831,6 @@ function displayVocabularyData(data) {
     // Get vocabulary cards container
     const vocabularyCards = document.querySelector('.vocabulary-cards');
     vocabularyCards.innerHTML = '';
-    
-    console.log('Processing vocabulary data:', JSON.stringify(data));
     
     // Check if data is in expected format
     if (!data || !data.vocabulary) {
