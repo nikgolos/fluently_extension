@@ -70,16 +70,16 @@ class PopupManager {
 
             // Update unique words count
             const uniqueWordsElement = document.getElementById('popupUniqueWords');
-            if (uniqueWordsElement && stats.uniqueWords !== undefined) {
-                uniqueWordsElement.textContent = stats.uniqueWords;
+            if (uniqueWordsElement && stats.unique_words_amount !== undefined) {
+                uniqueWordsElement.textContent = stats.unique_words_amount;
             }
 
             // Update speaking time
             const speakingTimeElement = document.getElementById('popupSpeakingTime');
-            if (speakingTimeElement && stats.totalSpeakingTime) {
+            if (speakingTimeElement && stats.speaking_time_seconds) {
                 // Convert seconds to MM:SS format
-                const minutes = Math.floor(stats.totalSpeakingTime / 60);
-                const seconds = Math.floor(stats.totalSpeakingTime % 60);
+                const minutes = Math.floor(stats.speaking_time_seconds / 60);
+                const seconds = Math.floor(stats.speaking_time_seconds % 60);
                 const formattedTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;
                 speakingTimeElement.textContent = formattedTime;
             }
