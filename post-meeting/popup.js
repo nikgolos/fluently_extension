@@ -89,6 +89,7 @@ class PopupManager {
             if (englishScoreElement) {
                 if (stats.api_englishScore !== undefined) {
                     englishScoreElement.textContent = stats.api_englishScore;
+                    this.updatePopupBasedOnScore(stats.api_englishScore);
                 } else {
                     // If no API score yet, show a default value or fetch from API
                     this.fetchEnglishScore(transcriptId, englishScoreElement);
@@ -97,6 +98,48 @@ class PopupManager {
 
         } catch (error) {
             console.error('Error loading popup data:', error);
+        }
+    }
+
+    // Update popup based on the user's English score
+    updatePopupBasedOnScore(score) {
+        const titleElement = document.querySelector('.popup-feedback-title');
+        const scoreStatElement = document.querySelector('.popup-stat-score');
+        const scoreValueElement = document.querySelector('.popup-stat-value-score');
+        
+        let title = 'Amazing result!';
+        let color = '#20AD14';
+        
+        if (score < 30) {
+            title = 'Try to improve!';
+            color = '#EA4335';
+        } else if (score < 45) {
+            title = 'Could be better.';
+            color = '#FF9F00';
+        } else if (score < 60) {
+            title = 'Not bad!';
+            color = '#FF9F00';
+        } else if (score < 80) {
+            title = 'Pretty good!';
+            color = '#20AD14';
+        } else {
+            title = 'Amazing result!';
+            color = '#20AD14';
+        }
+        
+        // Update title
+        if (titleElement) {
+            titleElement.textContent = title;
+        }
+        
+        // Update background color
+        if (scoreStatElement) {
+            scoreStatElement.style.background = `linear-gradient(to left, ${color}, ${color}), linear-gradient(to left, #ffffff, #ffffff)`;
+        }
+        
+        // Update score text color to match background color
+        if (scoreValueElement) {
+            scoreValueElement.style.color = color;
         }
     }
 
@@ -123,6 +166,7 @@ class PopupManager {
             if (response && response.general_score !== undefined) {
                 const englishScore = Math.round(response.general_score);
                 scoreElement.textContent = englishScore;
+                this.updatePopupBasedOnScore(englishScore);
                 
                 // Save the score to storage for future use
                 chrome.storage.local.get(['transcript_stats'], (result) => {
