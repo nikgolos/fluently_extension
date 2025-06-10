@@ -1,0 +1,39 @@
+/* Figma Styles of your File */
+:root {
+  /* Colors */
+  --scale-red-red: linear-gradient(
+    90deg,
+    rgba(255, 69, 58, 1) 0%,
+    rgba(255, 214, 10, 1) 18.50000023841858%,
+    rgba(50, 215, 75, 1) 41.49999916553497%,
+    rgba(50, 215, 75, 1) 60.50000190734863%,
+    rgba(255, 214, 10, 1) 79.50000166893005%,
+    rgba(255, 69, 58, 1) 100%
+  );
+  --scale-red-green: linear-gradient(
+    90deg,
+    rgba(255, 69, 58, 1) 0%,
+    rgba(255, 214, 10, 1) 21.361538767814636%,
+    rgba(50, 215, 75, 1) 58.858078718185425%,
+    rgba(45, 173, 20, 1) 99.80074167251587%
+  );
+
+  /* Fonts */
+  /* Effects */
+}
+/* Figma Color Variables of your File */
+:root,
+[data-variable-collection-mode="mode-1"] {
+  /* mode-1 */
+  --red: #ea4335;
+  --text-black: #212121;
+  --green: #2dad14;
+  --blue: #0957d0;
+  --text-grey: #5f6367;
+  --white: #ffffff;
+  --backgound-light-blue: #f3f8ff;
+  --background-dark-blue: #d8e6ff;
+  --header-black: #3c4042;
+  --icon-blue: #a7badd;
+  --grey: #c8ccd1;
+}
