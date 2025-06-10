@@ -6,6 +6,7 @@ class PopupManager {
         this.overlay = null;
         this.modal = null;
         this.button = null;
+        this.loader = null;
         this.isShown = false;
     }
 
@@ -14,15 +15,21 @@ class PopupManager {
         this.overlay = document.getElementById('popupOverlay');
         this.modal = document.getElementById('popupModal');
         this.button = document.getElementById('popupButton');
+        this.loader = document.getElementById('popupLoader');
 
         if (!this.overlay || !this.modal || !this.button) {
             console.error('Popup elements not found in DOM');
             return;
         }
 
-        this.setupEventListeners();
-        this.loadPopupData();
+        // Show popup first with loader visible
         this.showPopup();
+        
+        this.setupEventListeners();
+        this.setupStorageListener();
+        
+        // Load data after showing popup (loader is visible by default)
+        this.loadPopupData();
     }
 
     // Setup event listeners for closing the popup
@@ -47,6 +54,31 @@ class PopupManager {
         });
     }
 
+    // Setup listener for storage changes to update popup when main page gets API data
+    setupStorageListener() {
+        // Listen for storage changes (when main page saves API data)
+        chrome.storage.onChanged.addListener((changes, namespace) => {
+            if (namespace === 'local' && changes.transcript_stats) {
+                console.log('Storage changed, updating popup data');
+                this.loadPopupData();
+            }
+        });
+    }
+
+    // Show popup loader
+    showPopupLoader() {
+        if (this.loader) {
+            this.loader.style.display = 'flex';
+        }
+    }
+
+    // Hide popup loader
+    hidePopupLoader() {
+        if (this.loader) {
+            this.loader.style.display = 'none';
+        }
+    }
+
     // Load data for the popup from storage and API
     async loadPopupData() {
         try {
@@ -55,6 +87,7 @@ class PopupManager {
 
             if (!transcriptId) {
                 console.warn('No transcript ID found, using default popup data');
+                this.hidePopupLoader();
                 return;
             }
 
@@ -68,10 +101,16 @@ class PopupManager {
             const allStats = result.transcript_stats || {};
             const stats = allStats[transcriptId] || {};
 
+            console.log('Popup loading data for transcript:', transcriptId, stats);
+
+            let hasEnglishScore = false;
+            let hasBasicStats = false;
+
             // Update unique words count
             const uniqueWordsElement = document.getElementById('popupUniqueWords');
             if (uniqueWordsElement && stats.unique_words_amount !== undefined) {
                 uniqueWordsElement.textContent = stats.unique_words_amount;
+                hasBasicStats = true;
             }
 
             // Update speaking time
@@ -82,22 +121,37 @@ class PopupManager {
                 const seconds = Math.floor(stats.speaking_time_seconds % 60);
                 const formattedTime = `${minutes}:${seconds.toString().padStart(2, '0')}`;
                 speakingTimeElement.textContent = formattedTime;
+                hasBasicStats = true;
             }
 
             // Update English score from API
             const englishScoreElement = document.getElementById('popupEnglishScore');
             if (englishScoreElement) {
                 if (stats.api_englishScore !== undefined) {
+                    // Data exists in storage - load immediately
                     englishScoreElement.textContent = stats.api_englishScore;
                     this.updatePopupBasedOnScore(stats.api_englishScore);
+                    hasEnglishScore = true;
                 } else {
-                    // If no API score yet, show a default value or fetch from API
-                    this.fetchEnglishScore(transcriptId, englishScoreElement);
+                    console.log('No English score found, waiting for main page to fetch...');
                 }
+            }
+
+            // Only hide loader if we have English score OR if we have basic stats and should fetch API
+            if (hasEnglishScore) {
+                this.hidePopupLoader();
+            } else if (hasBasicStats) {
+                // We have basic stats but no English score - main page should be fetching it
+                // Keep loader visible and wait for storage update
+                console.log('Keeping loader visible while waiting for English score');
+            } else {
+                // No stats at all yet
+                console.log('No stats found yet, keeping loader visible');
             }
 
         } catch (error) {
             console.error('Error loading popup data:', error);
+            this.hidePopupLoader();
         }
     }
 
@@ -140,46 +194,6 @@ class PopupManager {
         // Update score text color to match background color
         if (scoreValueElement) {
             scoreValueElement.style.color = color;
-        }
-    }
-
-    // Fetch English score from API if not available in storage
-    async fetchEnglishScore(transcriptId, scoreElement) {
-        try {
-            // Get transcript text from storage
-            const transcriptData = await new Promise(resolve => {
-                chrome.storage.local.get(['transcripts'], (result) => {
-                    const transcripts = result.transcripts || {};
-                    resolve(transcripts[transcriptId]);
-                });
-            });
-
-            if (!transcriptData || !transcriptData.text) {
-                console.warn('No transcript text found for API call');
-                return;
-            }
-
-            // Create API service instance and fetch English stats
-            const apiService = new ApiService();
-            const response = await apiService.getEnglishStats(transcriptData.text);
-            
-            if (response && response.general_score !== undefined) {
-                const englishScore = Math.round(response.general_score);
-                scoreElement.textContent = englishScore;
-                this.updatePopupBasedOnScore(englishScore);
-                
-                // Save the score to storage for future use
-                chrome.storage.local.get(['transcript_stats'], (result) => {
-                    const allStats = result.transcript_stats || {};
-                    if (!allStats[transcriptId]) {
-                        allStats[transcriptId] = {};
-                    }
-                    allStats[transcriptId].api_englishScore = englishScore;
-                    chrome.storage.local.set({ transcript_stats: allStats });
-                });
-            }
-        } catch (error) {
-            console.error('Error fetching English score from API:', error);
         }
     }
 

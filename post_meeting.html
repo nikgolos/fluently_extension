@@ -565,6 +565,22 @@
        font-family: 'Google Sans', 'Roboto', sans-serif;
        font-weight: 700;
    }
+
+   /* Popup Loader Overlay */
+   .popup-loader-overlay {
+       position: absolute;
+       top: 0;
+       left: 0;
+       width: 100%;
+       height: 100%;
+       background-color: rgba(255, 255, 255, 0.95);
+       display: flex;
+       flex-direction: column;
+       justify-content: center;
+       align-items: center;
+       z-index: 10000;
+       border-radius: 40px;
+   }
    </style>
   <title>Meeting Stats</title>
   
@@ -575,6 +591,12 @@
   <!-- Popup Overlay -->
   <div class="popup-overlay" id="popupOverlay">
     <div class="popup-modal" id="popupModal">
+      <!-- Popup Loader -->
+      <div class="popup-loader-overlay" id="popupLoader">
+        <div class="loader-spinner"></div>
+        <div class="loader-text">Calculating your English score...</div>
+      </div>
+      
       <div class="popup-message">
         <div class="popup-message-top">
           <img class="popup-mascot" src="post-meeting/src/mascot0.png" />
@@ -598,7 +620,7 @@
                 <div class="popup-stat-icon">
                   <img src="post-meeting/src/group0.svg" style="width: 100%; height: 100%;" />
                 </div>
-                <div class="popup-stat-value" id="popupUniqueWords">89</div>
+                <div class="popup-stat-value" id="popupUniqueWords">--</div>
               </div>
               <div class="popup-stat-label-container">
                 <div class="popup-stat-label">Unique words</div>
@@ -606,7 +628,7 @@
             </div>
             <div class="popup-stat-score">
               <div class="popup-stat-value-container-score">
-                <div class="popup-stat-value-score" id="popupEnglishScore">99</div>
+                <div class="popup-stat-value-score" id="popupEnglishScore">--</div>
                 <div class="popup-stat-unit">out 100</div>
               </div>
               <div class="popup-stat-label-container">
@@ -618,7 +640,7 @@
                 <div class="popup-stat-icon">
                   <img src="post-meeting/src/group1.svg" style="width: 100%; height: 100%;" />
                 </div>
-                <div class="popup-stat-value" id="popupSpeakingTime">4:44</div>
+                <div class="popup-stat-value" id="popupSpeakingTime">--</div>
               </div>
               <div class="popup-stat-label-container">
                 <div class="popup-stat-label">Speaking time</div>
