@@ -39,6 +39,27 @@ class PopupManager {
             this.hidePopup();
         });
 
+        // Handle "STOP, PLEASE" button click
+        const stopButton = document.querySelector('.popup-button-gray');
+        if (stopButton) {
+            const stopButtonText = stopButton.querySelector('.popup-button-text-secondary');
+            
+            stopButton.addEventListener('click', () => {
+                // Change text to "NO!"
+                if (stopButtonText) {
+                    stopButtonText.textContent = 'NO!';
+                }
+                
+                // Change border color to white
+                stopButton.style.borderColor = 'white';
+                
+                // Close popup after 2 seconds
+                setTimeout(() => {
+                    this.hidePopup();
+                }, 2000);
+            });
+        }
+
         // Close popup when clicking outside the modal
         this.overlay.addEventListener('click', (e) => {
             if (e.target === this.overlay) {
