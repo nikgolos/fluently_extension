@@ -517,11 +517,11 @@
 
    .popup-button {
        background: #0957d0;
-       border-radius: 10px;
+       border-radius: 16px;
        border-style: solid;
        border-color: #00317c;
-       border-width: 0px 0px 2px 0px;
-       padding: 14px 50px 14px 50px;
+       border-width: 0px 0px 3px 0px;
+       padding: 14px 30px 14px 30px;
        display: flex;
        flex-direction: row;
        gap: 5px;
@@ -537,8 +537,46 @@
        background: #0846b8;
    }
 
+   .popup-button-gray {
+       background: #ffffff;
+       border-radius: 16px;
+       border-style: solid;
+       border-color: #b1b1b1;
+       border-width: 1.5px 1.5px 3.5px 1.5px;
+       padding: 14px 30px 14px 30px;
+       display: flex;
+       flex-direction: row;
+       gap: 5px;
+       align-items: center;
+       justify-content: center;
+       flex-shrink: 0;
+       position: relative;
+       cursor: pointer;
+       transition: background-color 0.2s ease;
+   }
+
+   .popup-button-gray:hover {
+       background: #f1f1f1;
+   }
+
+   .popup-buttons-container {
+       display: flex;
+       flex-direction: row;
+       gap: 15px;
+       align-items: center;
+       justify-content: center;
+   }
+
    .popup-button-text {
        color: #ffffff;
+       text-align: center;
+       font-family: 'Google Sans', 'Roboto', sans-serif;
+       font-size: 14px;
+       font-weight: 700;
+       position: relative;
+   }
+   .popup-button-text-secondary {
+       color: #B1B1B1;
        text-align: center;
        font-family: 'Google Sans', 'Roboto', sans-serif;
        font-size: 14px;
@@ -553,7 +591,7 @@
        font-size: 12px;
        font-weight: 400;
        position: absolute;
-       left: 140px;
+       left: 160px;
        bottom: 10px;
    }
 
@@ -649,13 +687,18 @@
           </div>
         </div>
       </div>
-      <div class="popup-button" id="popupButton">
-        <div class="popup-button-text">REVIEW MY MISTAKES</div>
+      <div class="popup-buttons-container">
+        <div class="popup-button" id="popupButton">
+          <div class="popup-button-text">REVIEW MY MISTAKES</div>
+        </div>
+        <div class="popup-button-gray">
+          <div class="popup-button-text-secondary">STOP, PLEASE</div>
+        </div>
       </div>
       <div class="popup-footer-text">
         <span>
           <span class="popup-footer-text-normal">powered by</span>
-          <span class="popup-footer-text-bold">Google Meet English Checker</span>
+          <span class="popup-footer-text-bold">English-Checker.com</span>
         </span>
       </div>
     </div>
